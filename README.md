@@ -1,5 +1,8 @@
 # Energy Bills and Levies Model
 
+## Description
+Model of domestic energy bills and levies to test the impacts of changing different components of domestic energy bills, project these changes into the future, and investigate how impacts of changes vary across different household archetypes via distributional analysis.
+
 ## Setup
 
 - Meet the data science cookiecutter [requirements](http://nestauk.github.io/ds-cookiecutter/quickstart), in brief:
