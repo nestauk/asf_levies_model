@@ -1,0 +1,5 @@
+# Change these at your peril:
+export PROJECT_NAME=Energy Bills and Levies Model
+export REPO_NAME=asf_levies_model
+export DESCRIPTION=Analytical model of domestic energy bills and levies.
+export PROJECT_OPENNESS=public
