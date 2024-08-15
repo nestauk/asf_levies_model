@@ -900,3 +900,287 @@ def combine_consumption_values(
     ).reset_index(drop=True)
 
     return combined_consumption_values_df
+
+
+# Functions for processing DUKES data
+
+
+def download_dukes(url: str, table_number: str):
+    """Retrieves file from gov.uk website and saves to file.
+
+    Parameters
+    ----------
+    url : str
+        URL of target file.
+    table_number : str
+        DUKES table number, separated with underscore instead of period (e.g. 4_1, not 4.1).
+    """
+
+    response = requests.get(url)
+    if response.ok == True and response.status_code == 200:
+        date = datetime.datetime.now().strftime("%Y%m%d")
+        data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+        with open(f"{data_root}{date}_dukes_{table_number}.xlsx", mode="wb") as file:
+            print("File retrieved successfully.")
+            file.write(response.content)
+
+
+def _get_raw_dataframe_dukes(tab_name: str, table_number: str) -> pd.DataFrame:
+    """Creates a pandas dataframe of raw data from DUKES spreadsheet tab corresponding to table of interest.
+
+    Parameters
+    ----------
+    tab_name : str
+        Name of spreadsheet tab in Excel file.
+    table_number : str
+        DUKES table number, separated with underscore instead of period (e.g. 4_1, not 4.1).
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe of raw data from spreadsheet tab.
+
+    Raises
+    ------
+    ValueError
+        If tab_name given does not correspond to a tab in the spreadsheet.
+    """
+
+    date = datetime.datetime.now().strftime("%Y%m%d")
+    data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+    xls = pd.ExcelFile(f"{data_root}{date}_dukes_{table_number}.xlsx")
+
+    try:
+        sheet = [
+            sheet_name for sheet_name in xls.sheet_names if tab_name in sheet_name
+        ][0]
+    except:
+        raise ValueError(
+            "Acronym given does not correspond to a valid tab in the spreadsheet."
+        )
+
+    skip_rows = list(range(0, 2))
+    return pd.read_excel(
+        f"{data_root}{date}_dukes_{table_number}.xlsx",
+        sheet_name=sheet,
+        skiprows=lambda x: x in skip_rows,
+        header=1,
+    ).reset_index(drop=True)
+
+
+def get_dukes_supply_data(dukes_year: str) -> tuple:
+    """Extracts total and domestic gas and electricity supply values from DUKES 4.1 and 5.2, respectively.
+
+    Parameters
+    ----------
+    dukes_year : str
+        Year of interest for data.
+
+    Returns
+    -------
+    tuple
+        Tuple of floats (Total gas supply, Domestic gas supply, Total electricity supply, Domestic electricity supply).
+    """
+
+    ## Gas supply values
+    # Dataframe of sheet in tab corresponding to year in DUKES 4.1 (gas)
+    dukes_4_1_df = _get_raw_dataframe_dukes(dukes_year, "4_1")
+
+    # Extract values
+    total_row = np.where(dukes_4_1_df["Column1"] == "Total supply")
+    dukes_total_gas = dukes_4_1_df.iloc[total_row]["Natural gas"].values[0]
+    domestic_row = np.where(dukes_4_1_df["Column1"] == "Domestic")
+    dukes_domestic_gas = dukes_4_1_df.iloc[domestic_row]["Natural gas"].values[0]
+
+    ## Electricity supply values
+    # Dataframe of sheet in tab of interest
+    dukes_5_2_df = _get_raw_dataframe_dukes("5.2", "5_2")
+
+    # Extract values
+    year_column = np.where(dukes_5_2_df == f"Total ({dukes_year})")[1][0]
+    total_row = np.where(dukes_5_2_df == "Total supply")[0][0]
+    domestic_row = np.where(dukes_5_2_df == "Domestic [note 6]")[0][0]
+
+    dukes_total_elec = dukes_5_2_df.iloc[total_row, year_column]
+    dukes_domestic_elec = dukes_5_2_df.iloc[domestic_row, year_column]
+
+    return dukes_total_gas, dukes_domestic_gas, dukes_total_elec, dukes_domestic_elec
+
+
+# Functions for processing Subnational Consumption Statistics data
+
+
+def download_subnational_consumption(url: str, fuel: str):
+    """Retrieves file from gov.uk website and saves to file.
+
+    Parameters
+    ----------
+    url : str
+        URL of target file.
+    fuel : str
+        "gas" or "electricity".
+    """
+
+    response = requests.get(url)
+    if response.ok == True and response.status_code == 200:
+        date = datetime.datetime.now().strftime("%Y%m%d")
+        data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+        with open(
+            f"{data_root}{date}_subnational_consumption_{fuel}.xlsx", mode="wb"
+        ) as file:
+            print("File retrieved successfully.")
+            file.write(response.content)
+
+
+def _get_raw_dataframe_subnational_consumption(
+    tab_name: str, fuel: str
+) -> pd.DataFrame:
+    """Creates a pandas dataframe of raw data from subnational consumption spreadsheet tab corresponding to table of interest.
+
+    Parameters
+    ----------
+    tab_name : str
+        Name of spreadsheet tab in Excel file.
+    fuel : str
+        "gas" or "electricity".
+
+    Returns
+    -------
+    pd.DataFrame
+       Dataframe of raw data from spreadsheet tab.
+
+    Raises
+    ------
+    ValueError
+        If tab_name given does not correspond to a tab in the spreadsheet.
+    """
+
+    date = datetime.datetime.now().strftime("%Y%m%d")
+    data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+    xls = pd.ExcelFile(f"{data_root}{date}_subnational_consumption_{fuel}.xlsx")
+
+    try:
+        sheet = [
+            sheet_name for sheet_name in xls.sheet_names if tab_name in sheet_name
+        ][0]
+    except:
+        raise ValueError(
+            "Acronym given does not correspond to a valid tab in the spreadsheet."
+        )
+
+    skip_rows = list(range(0, 2))
+    return pd.read_excel(
+        f"{data_root}{date}_subnational_consumption_{fuel}.xlsx",
+        sheet_name=sheet,
+        skiprows=lambda x: x in skip_rows,
+        header=1,
+    ).reset_index(drop=True)
+
+
+def get_subnational_consumption_data(subnational_year: str) -> tuple:
+    """Extracts meter point and consumption data from Subnational Consumption Statistics for gas and electricity.
+
+    Parameters
+    ----------
+    subnational_year : str
+        Year of interest for data.
+
+    Returns
+    -------
+    tuple
+        Tuple of floats (x8) for gas meters (total, domestic), electricity meters (total, domestic), gas consumption (total, domestic) and electricity consumption (total, domestic).
+    """
+
+    ## Gas
+
+    # Dataframe of sheet in tab of interest
+    subnational_consumption_gas_df = _get_raw_dataframe_subnational_consumption(
+        subnational_year, "gas"
+    )
+
+    # Extract values - number of meters
+    gb_row = np.where(
+        subnational_consumption_gas_df == "Great Britain (inc unallocated)"
+    )[0][0]
+    all_meters_row = np.where(
+        subnational_consumption_gas_df == "Number of meters\n(thousands):\nAll meters"
+    )[1][0]
+    subnational_total_gas_meters = (
+        subnational_consumption_gas_df.iloc[gb_row, all_meters_row] * 1000
+    )
+    domestic_meters_row = np.where(
+        subnational_consumption_gas_df == "Number of meters\n(thousands):\nDomestic\n"
+    )[1][0]
+    subnational_domestic_gas_meters = (
+        subnational_consumption_gas_df.iloc[gb_row, domestic_meters_row] * 1000
+    )
+
+    # Extract values - consumption
+    gb_row = np.where(
+        subnational_consumption_gas_df == "Great Britain (inc unallocated)"
+    )[0][0]
+    total_row = np.where(
+        subnational_consumption_gas_df == "Total consumption\n(GWh):\nAll meters"
+    )[1][0]
+    subnational_total_gas = (
+        subnational_consumption_gas_df.iloc[gb_row, total_row] * 1000
+    )
+    domestic_row = np.where(
+        subnational_consumption_gas_df == "Total consumption\n(GWh):\nDomestic\n"
+    )[1][0]
+    subnational_domestic_gas = (
+        subnational_consumption_gas_df.iloc[gb_row, domestic_row] * 1000
+    )
+
+    ## Electricity
+
+    # Dataframe of sheet in tab of interest
+    subnational_consumption_elec_df = _get_raw_dataframe_subnational_consumption(
+        subnational_year, "electricity"
+    )
+
+    # Extract values - number of meters
+    gb_row = np.where(
+        subnational_consumption_elec_df == "Great Britain (inc unallocated)"
+    )[0][0]
+    all_meters_row = np.where(
+        subnational_consumption_elec_df == "Number of meters\n(thousands):\nAll meters"
+    )[1][0]
+    subnational_total_elec_meters = (
+        subnational_consumption_elec_df.iloc[gb_row, all_meters_row] * 1000
+    )
+    domestic_meters_row = np.where(
+        subnational_consumption_elec_df
+        == "Number of meters\n(thousands):\nAll Domestic"
+    )[1][0]
+    subnational_domestic_elec_meters = (
+        subnational_consumption_elec_df.iloc[gb_row, domestic_meters_row] * 1000
+    )
+
+    # Extract values - consumption
+    gb_row = np.where(
+        subnational_consumption_elec_df == "Great Britain (inc unallocated)"
+    )[0][0]
+    total_row = np.where(
+        subnational_consumption_elec_df == "Total consumption\n(GWh):\nAll meters"
+    )[1][0]
+    subnational_total_elec = (
+        subnational_consumption_elec_df.iloc[gb_row, total_row] * 1000
+    )
+    domestic_row = np.where(
+        subnational_consumption_elec_df == "Total consumption\n(GWh):\nAll Domestic"
+    )[1][0]
+    subnational_domestic_elec = (
+        subnational_consumption_elec_df.iloc[gb_row, domestic_row] * 1000
+    )
+
+    return (
+        subnational_total_gas_meters,
+        subnational_domestic_gas_meters,
+        subnational_total_gas,
+        subnational_domestic_gas,
+        subnational_total_elec_meters,
+        subnational_domestic_elec_meters,
+        subnational_total_elec,
+        subnational_domestic_elec,
+    )

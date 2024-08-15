@@ -1,3 +1,31 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     comment_magics: true
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: asf_levies_model
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
+# ### **Getting data inputs for core model**
+
+# %% [markdown]
+# Running this file saves the following parquet files in inputs/data:
+# - Policy cost input data (RO, WHD, ECO, AAHEDC, GGL, FIT)
+# - Default tariff component costs (Standard Credit, Gas and Electricity (Single-rate), Nil and Typical consumption)
+# - Gas and electricity consumption values (typical and for each Ofgem energy archetype)
+# - Gas and electricity supply volumes from DUKES and Subnational Consumption Statistics
+# - Gas and electricity meter points from Subnational Consumption Statistics
+
 # %% [markdown]
 # #### **Getting data from Annex 4: Policy cost allowance methodology**
 
@@ -373,3 +401,126 @@ data_root = f"{PROJECT_DIR}/inputs/data/analysis_cache/"
 date = datetime.datetime.now().strftime("%Y%m%d")
 
 consumption_values_tidy_df.to_parquet(f"{data_root}{date}_consumption_values.parquet")
+
+# %% [markdown]
+# #### **Getting data from DUKES 2024**
+
+# %%
+import requests
+import pandas as pd
+import datetime
+import numpy as np
+import math
+import pandera as pa
+
+from asf_levies_model.getters.load_data import download_dukes, get_dukes_supply_data
+
+import asf_levies_model.config.data_config as data_config
+
+from asf_levies_model import PROJECT_DIR
+
+# %% [markdown]
+# DUKES 4.1 Natural gas commodity balance and DUKES 5.2 Electricity commodity balances, public distribution system and other generators
+
+# %%
+# Copy and paste URL for most recent DUKES 4.1
+url = "https://assets.publishing.service.gov.uk/media/66a7aebe49b9c0597fdb0684/DUKES_4.1.xlsx"
+download_dukes(url, "4_1")
+
+# Copy and paste URL for most recent DUKES 5.2
+url = "https://assets.publishing.service.gov.uk/media/66a7da36ce1fd0da7b592f0c/DUKES_5.2.xlsx"
+download_dukes(url, "5_2")
+
+# %%
+dukes_year = "2023"
+
+dukes_total_gas, dukes_domestic_gas, dukes_total_elec, dukes_domestic_elec = (
+    get_dukes_supply_data(dukes_year)
+)
+
+# %% [markdown]
+# #### **Getting data from Regional and local authority consumption statistics**
+
+# %%
+import requests
+import pandas as pd
+import datetime
+import numpy as np
+import math
+import pandera as pa
+
+from asf_levies_model.getters.load_data import (
+    download_subnational_consumption,
+    get_subnational_consumption_data,
+)
+
+import asf_levies_model.config.data_config as data_config
+
+from asf_levies_model import PROJECT_DIR
+
+# %%
+# Copy and paste URL for most recent subnational gas consumption statistics file (non-weather-corrected)
+url = "https://assets.publishing.service.gov.uk/media/65b030021702b1000dcb111b/Subnational_gas_consumption_statistics_non_weather_corrected_2015-2022.xlsx"
+download_subnational_consumption(url, "gas")
+
+# %%
+# Copy and paste URL for most recent subnational electricity consumption statistics file
+url = "https://assets.publishing.service.gov.uk/media/65b024e0160765000d18f73c/Subnational_electricity_consumption_statistics_2005-2022.xlsx"
+download_subnational_consumption(url, "electricity")
+
+# %%
+subnational_year = "2022"
+(
+    subnational_total_gas_meters,
+    subnational_domestic_gas_meters,
+    subnational_total_gas,
+    subnational_domestic_gas,
+    subnational_total_elec_meters,
+    subnational_domestic_elec_meters,
+    subnational_total_elec,
+    subnational_domestic_elec,
+) = get_subnational_consumption_data(subnational_year)
+
+# %% [markdown]
+# Compiling all supply volume and meter points data
+
+# %%
+# Create dataframe
+supply_volume_dict = {
+    "DUKESYear": pd.Series(dukes_year),
+    "DUKESTotalGas": pd.Series(dukes_total_gas),
+    "DUKESTotalElec": pd.Series(dukes_total_elec),
+    "DUKESDomesticGas": pd.Series(dukes_domestic_gas),
+    "DUKESDomesticElec": pd.Series(dukes_domestic_elec),
+    "SubnationalYear": pd.Series(subnational_year),
+    "SubnationalTotalGas": pd.Series(subnational_total_gas),
+    "SubnationalTotalElec": pd.Series(subnational_total_elec),
+    "SubnationalDomesticGas": pd.Series(subnational_domestic_gas),
+    "SubnationalDomesticElec": pd.Series(subnational_domestic_elec),
+}
+supply_volumes = pd.DataFrame(supply_volume_dict)  # All values in MWh
+
+# Save to file
+data_root = f"{PROJECT_DIR}/inputs/data/analysis_cache/"
+date = datetime.datetime.now().strftime("%Y%m%d")
+supply_volumes.to_parquet(f"{data_root}{date}_supply_volume_data.parquet")
+
+# %% [markdown]
+# Compiling meter points data
+
+# %%
+# Create dataframe
+meter_points_dict = {
+    "SubnationalYear": pd.Series(subnational_year),
+    "SubnationalTotalMetersGas": pd.Series(subnational_total_gas_meters),
+    "SubnationalTotalMetersElec": pd.Series(subnational_total_elec_meters),
+    "SubnationalDomesticMetersGas": pd.Series(subnational_domestic_gas_meters),
+    "SubnationalDomesticMetersElec": pd.Series(subnational_domestic_elec_meters),
+}
+meter_points = pd.DataFrame(meter_points_dict)
+
+# Save to file
+data_root = f"{PROJECT_DIR}/inputs/data/analysis_cache/"
+date = datetime.datetime.now().strftime("%Y%m%d")
+
+meter_points.to_parquet(f"{data_root}{date}_meter_points_data.parquet")
