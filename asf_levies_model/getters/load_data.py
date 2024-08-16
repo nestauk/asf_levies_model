@@ -988,9 +988,9 @@ def get_dukes_supply_data(dukes_year: str) -> tuple:
 
     # Extract values
     total_row = np.where(dukes_4_1_df["Column1"] == "Total supply")
-    dukes_total_gas = dukes_4_1_df.iloc[total_row]["Natural gas"].values[0]
+    dukes_total_gas = dukes_4_1_df.iloc[total_row]["Natural gas"].values[0] * 1000
     domestic_row = np.where(dukes_4_1_df["Column1"] == "Domestic")
-    dukes_domestic_gas = dukes_4_1_df.iloc[domestic_row]["Natural gas"].values[0]
+    dukes_domestic_gas = dukes_4_1_df.iloc[domestic_row]["Natural gas"].values[0] * 1000
 
     ## Electricity supply values
     # Dataframe of sheet in tab of interest
@@ -1001,8 +1001,8 @@ def get_dukes_supply_data(dukes_year: str) -> tuple:
     total_row = np.where(dukes_5_2_df == "Total supply")[0][0]
     domestic_row = np.where(dukes_5_2_df == "Domestic [note 6]")[0][0]
 
-    dukes_total_elec = dukes_5_2_df.iloc[total_row, year_column]
-    dukes_domestic_elec = dukes_5_2_df.iloc[domestic_row, year_column]
+    dukes_total_elec = dukes_5_2_df.iloc[total_row, year_column] * 1000
+    dukes_domestic_elec = dukes_5_2_df.iloc[domestic_row, year_column] * 1000
 
     return dukes_total_gas, dukes_domestic_gas, dukes_total_elec, dukes_domestic_elec
 
