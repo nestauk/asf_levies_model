@@ -309,3 +309,94 @@ electricity.calculate_total_consumption(TYPICAL_CONSUMPTION_ELECTRICITY)
 
 # %%
 electricity.calculate_total_consumption(TYPICAL_CONSUMPTION_ELECTRICITY, vat=True)
+
+
+# %%
+
+
+# %%
+class Levy:
+    def __init__(
+        self,
+        name,
+        electricity,
+        gas,
+        general_taxation,
+        electricity_variable_rate,
+        electricity_fixed_rate,
+        gas_variable_rate,
+        gas_fixed_rate,
+        revenue,
+    ):
+        self.name = name
+
+        # Mode split
+        self.electricity = electricity
+        self.gas = gas
+        self.general_taxation = general_taxation
+
+        # Mode of levying
+        self.electricity_variable_rate = electricity_variable_rate
+        self.electricity_fixed_rate = electricity_fixed_rate
+        self.gas_variable_rate = gas_variable_rate
+        self.gas_fixed_rate = gas_fixed_rate
+
+        # Total revenue
+        self.revenue = revenue
+
+
+# %%
+# RO
+
+ro = Levy(
+    name="Renewable Obligation",
+    electricity=1.0,
+    gas=0.0,
+    general_taxation=0.0,
+    electricity_variable_rate=31.78243,
+    electricity_fixed_rate=None,
+    gas_variable_rate=None,
+    gas_fixed_rate=None,
+    revenue=7_890_000_000,
+)
+
+# %% [markdown]
+# My read is that all electricity suppliers are required to participate in RO, regardless of size, if they have a supply of > 0.
+#
+# Therefore, under a hypothetical supply scenario, all gas suppliers should also be obligateed.
+#
+# By comparison, ECO is an obligation on medium and large suppliers. A supplier meets the obligation threshold according to customer numbers and supply volumes.
+
+# %%
+# From annex 4 eco sheet
+eco_elec_volume = 93_503_455
+eco_gas_supply_volume = 271_672_723
+
+# %%
+# Total supply volumes Dukes
+dukes_net_electricity = 245_541_160
+dukes_net_gas = 237_099_850
+
+# %%
+res_elec_demand = 8603.78787390749 * 11.63
+res_gas_demand = 21763.9242306998 * 11.63
+
+# %%
+res_elec_demand, res_gas_demand
+
+# %%
+res_elec_demand / (res_elec_demand + res_gas_demand)
+
+# %%
+res_elec_demand / res_gas_demand
+
+# %%
+eco_elec_volume / eco_gas_supply_volume
+
+# %%
+# Subnational consumption of gas (non-weather corrected)
+gb_domestic_2022 = 265_197_947
+gb_total_2022 = 435_369_123
+
+# %%
+# Subnational consumption of electricity (gb)
