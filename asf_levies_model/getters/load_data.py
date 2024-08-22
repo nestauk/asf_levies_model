@@ -30,15 +30,17 @@ def download_annex_4(url: str) -> None:
             print("Failed to download annex 4", rex)
 
 
-def _find_latest_annex_4(data_root: str) -> str:
-    """Gets most recent stored annex 4 date."""
+def _find_latest_annex(data_root: str, annex_to_find: int) -> str:
+    """Gets most recent stored annex date."""
     available_dates = [
-        f.split("_")[0] for f in listdir(data_root) if "ofgem_annex_4" in f
+        f.split("_")[0]
+        for f in listdir(data_root)
+        if f"ofgem_annex_{annex_to_find}" in f
     ]
     if len(available_dates) > 0:
         return sorted(available_dates, reverse=True)[0]
     else:
-        raise FileNotFoundError("No local copies of Annex 4 available.")
+        raise FileNotFoundError(f"No local copies of Annex {annex_to_find} available.")
 
 
 def _get_excel_sheet_names(file_path: str) -> list:
@@ -56,7 +58,7 @@ def _get_raw_dataframe_annex4(policy_name: str) -> pd.DataFrame:
     spreadsheet tab corresponding to policy of interest."""
     date = datetime.datetime.now()
     data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-    latest_annex_4 = _find_latest_annex_4(data_root)
+    latest_annex_4 = _find_latest_annex(data_root, 4)
     if (
         day_diff := (date - datetime.datetime.strptime(latest_annex_4, "%Y%m%d")).days
     ) > 7:
@@ -375,3 +377,163 @@ def process_data_FIT() -> pd.DataFrame:
         format="%B %Y",
     )
     return data_tidy_df
+
+
+# Functions for getting and processing Annex 9 data
+
+
+def download_annex_9(url: str) -> None:
+    """Retrieves file from Ofgem website and saves to file."""
+    with Session() as session:
+        try:
+            response = session.get(url)
+            date = datetime.datetime.now().strftime("%Y%m%d")
+            data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+            with open(f"{data_root}{date}_ofgem_annex_9.xlsx", mode="wb") as file:
+                file.write(response.content)
+            print("File retrieved successfully.")
+        except RequestException as rex:
+            print("Failed to download annex 9", rex)
+
+
+def _get_raw_dataframe_annex9(data_name: str) -> pd.DataFrame:
+    """Creates a pandas dataframe of raw data from Ofgem Annex 9
+    spreadsheet tab corresponding to policy of interest."""
+    date = datetime.datetime.now()
+    data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+    latest_annex_9 = _find_latest_annex(data_root, 9)
+    if (
+        day_diff := (date - datetime.datetime.strptime(latest_annex_9, "%Y%m%d")).days
+    ) > 7:
+        warnings.warn(f"Using copy of Annex 9 downloaded {day_diff} days ago.")
+    filepath = f"{data_root}{latest_annex_9}_ofgem_annex_9.xlsx"
+    try:
+        sheet = [
+            sheet_name
+            for sheet_name in _get_excel_sheet_names(filepath)
+            if data_name in sheet_name
+        ][0]
+    except:
+        raise ValueError("Input does not correspond to a valid tab in the spreadsheet.")
+
+    return pd.read_excel(
+        filepath, sheet_name=sheet, header=1, index_col=0, engine="calamine"
+    ).reset_index(drop=True)
+
+
+def slice_tariff_components_tables(
+    sheet_start_row: int, levelisation: bool
+) -> pd.DataFrame:
+    """Extracts tariff components tables of interest from Annex 9 tab "1c Consumption adjusted levels".
+
+    Parameters
+    ----------
+    sheet_start_row : int
+        Row number of header row in target tables in sheet "1c Consumption adjusted levels".
+
+    levelisation : bool
+        Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe of tariff components tables of interest.
+    """
+
+    # Create dataframe of raw consumption adjusted level costs from spreadsheet tab
+    consumption_adjusted_levels_df = _get_raw_dataframe_annex9(
+        "Consumption adjusted levels"
+    )
+
+    if levelisation is True:
+        tariff_tables_df = consumption_adjusted_levels_df.iloc[
+            (sheet_start_row - 3) : (sheet_start_row + 10), :
+        ]
+    else:
+        tariff_tables_df = consumption_adjusted_levels_df.iloc[
+            (sheet_start_row - 3) : (sheet_start_row + 9), :
+        ]
+
+    return tariff_tables_df
+
+
+def extract_single_tariff_table(
+    input_df: pd.DataFrame,
+    type_of_consumption: str,
+    table_number: int,
+) -> pd.DataFrame:
+    """Generates a dataframe for a single tariff components table (i.e. only one of Electricity single-rate/Electricity multi-register/Gas/Duel Fuel)
+
+    Parameters
+    ----------
+    input_df : pd.DataFrame
+        Dataframe of tariff components tables of interest (output of _slice_tariff_components function)
+    type_of_consumption : str
+        _"Nil consumption" or "Typical consumption" ONLY.
+    table_number : int
+        1: Electricity single-rate; 2: Electricity multi-register; 3: Gas; 4: Duel fuel
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe of single tariff components table of interest.
+    """
+    col_names = (
+        (input_df == type_of_consumption)
+        .sum(axis=0)
+        .astype(bool)
+        .pipe(lambda df: df.index[df])
+    )
+
+    single_tariff_table_df = input_df.loc[
+        :,
+        col_names[table_number - 1] : (
+            input_df.columns[(input_df.columns == col_names[table_number]).argmax() - 1]
+            if table_number < len(col_names)
+            else None
+        ),
+    ]
+
+    # Drop empty columns
+    single_tariff_table_df = single_tariff_table_df.dropna(axis=1, how="all")
+    # Make first row the header column
+    single_tariff_table_df.columns = single_tariff_table_df.iloc[0].to_list()
+    # Table without first row
+    single_tariff_table_df = single_tariff_table_df.iloc[1:, :]
+    # Replace "-" with na
+    single_tariff_table_df = single_tariff_table_df.replace(
+        "[\u002D\u058A\u05BE\u1400\u1806\u2010-\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D]",
+        None,
+        regex=True,
+    )
+    return single_tariff_table_df
+
+
+def tidy_tariff_table(input_df: pd.DataFrame, type_of_consumption: str) -> pd.DataFrame:
+    """Generates a dataframe for tariff components for one fuel type-payment method in tidy format.
+
+    Parameters
+    ----------
+    input_df : pd.DataFrame
+        Dataframe of tariff components table of interest (output of _extract_single_tariff_table function).
+    type_of_consumption : str
+        "Nil consumption" or "Typical consumption" ONLY.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframing containing tariff component values for one fuel type-payment method in tidy format.
+    """
+    # Tidy input data
+    tidy_df = input_df.melt(
+        id_vars=type_of_consumption, var_name="28AD_Charge_Restriction_Period"
+    )
+    # Add start and end dates
+    tidy_df["28AD_Charge_Restriction_Period_start"] = pd.to_datetime(
+        tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[0]
+    )
+    tidy_df["28AD_Charge_Restriction_Period_end"] = pd.to_datetime(
+        tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[1]
+    )
+
+    return tidy_df
