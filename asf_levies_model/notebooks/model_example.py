@@ -38,7 +38,7 @@ levies = [
     GGL.from_dataframe(
         process_data_GGL(), denominator=24_503_683
     ),  # domestic denominator
-    WHD.from_dataframe(process_data_WHD()),  # domestic onyl levy
+    WHD.from_dataframe(process_data_WHD()),  # domestic only levy
     ECO.from_dataframe(process_data_ECO()),  # domestic only levy
     FIT.from_dataframe(
         process_data_FIT()
@@ -48,7 +48,7 @@ levies = [
 
 # %%
 # get sum of policy costs for typical consumption
-sum([levy.calculate_levy(2.7, 11.5, True, True) for levy in levies])
+sum([levy.calculate_levy(2.7, 0, True, False) for levy in levies])
 
 # %%
 # deonminators from subnational consumption estimates
@@ -109,8 +109,10 @@ rebalance_electricity_variable = {
     "new_electricity_weight": 1,
     "new_gas_weight": 0,
     "new_tax_weight": 0,
-    "new_variable_weight": 1,
-    "new_fixed_weight": 0,
+    "new_variable_weight_elec": 1,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 0,
 }
 
 elec_var_levies = [
@@ -130,8 +132,10 @@ rebalance_gas_variable = {
     "new_electricity_weight": 0,
     "new_gas_weight": 1,
     "new_tax_weight": 0,
-    "new_variable_weight": 1,
-    "new_fixed_weight": 0,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 1,
+    "new_fixed_weight_gas": 0,
 }
 
 gas_var_levies = [
@@ -149,8 +153,10 @@ rebalance_electricity_fixed = {
     "new_electricity_weight": 1,
     "new_gas_weight": 0,
     "new_tax_weight": 0,
-    "new_variable_weight": 0,
-    "new_fixed_weight": 1,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 1,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 0,
 }
 
 elec_fixed_levies = [
@@ -168,8 +174,10 @@ rebalance_gas_fixed = {
     "new_electricity_weight": 0,
     "new_gas_weight": 1,
     "new_tax_weight": 0,
-    "new_variable_weight": 0,
-    "new_fixed_weight": 1,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 1,
 }
 
 gas_fixed_levies = [
