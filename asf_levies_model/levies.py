@@ -10,8 +10,10 @@ class Levy:
         electricity_weight,
         gas_weight,
         tax_weight,
-        variable_weight,
-        fixed_weight,
+        electricity_variable_weight,
+        electricity_fixed_weight,
+        gas_variable_weight,
+        gas_fixed_weight,
         electricity_variable_rate,
         electricity_fixed_rate,
         gas_variable_rate,
@@ -28,8 +30,10 @@ class Levy:
         self.tax_weight = tax_weight
 
         # Levy method
-        self.variable_weight = variable_weight
-        self.fixed_weight = fixed_weight
+        self.electricity_variable_weight = electricity_variable_weight
+        self.electricity_fixed_weight = electricity_fixed_weight
+        self.gas_variable_weight = gas_variable_weight
+        self.gas_fixed_weight = gas_fixed_weight
 
         # levy rate
         self.electricity_variable_rate = electricity_variable_rate
@@ -68,8 +72,10 @@ class Levy:
         new_electricity_weight,
         new_gas_weight,
         new_tax_weight,
-        new_variable_weight,
-        new_fixed_weight,
+        new_variable_weight_elec,
+        new_fixed_weight_elec,
+        new_variable_weight_gas,
+        new_fixed_weight_gas,
         supply_gas,
         supply_elec,
         customers_gas,
@@ -83,12 +89,12 @@ class Levy:
         revenue_tax = self.revenue * new_tax_weight
 
         # New variable levy rate
-        new_levy_var_gas = (revenue_gas / supply_gas) * new_variable_weight
-        new_levy_var_elec = (revenue_elec / supply_elec) * new_variable_weight
+        new_levy_var_gas = (revenue_gas / supply_gas) * new_variable_weight_gas
+        new_levy_var_elec = (revenue_elec / supply_elec) * new_variable_weight_elec
 
         # New fixed levy rate
-        new_levy_fixed_gas = (revenue_gas / customers_gas) * new_fixed_weight
-        new_levy_fixed_elec = (revenue_elec / customers_elec) * new_fixed_weight
+        new_levy_fixed_gas = (revenue_gas / customers_gas) * new_fixed_weight_gas
+        new_levy_fixed_elec = (revenue_elec / customers_elec) * new_fixed_weight_elec
 
         if not self._is_revenue_maintained(
             new_levy_var_gas,
@@ -109,8 +115,10 @@ class Levy:
             self.gas_weight = new_gas_weight
             self.tax_weight = new_tax_weight
 
-            self.variable_weight = new_variable_weight
-            self.fixed_weight = new_fixed_weight
+            self.electricity_variable_weight = new_variable_weight_elec
+            self.electricity_fixed_weight = new_fixed_weight_elec
+            self.gas_variable_weight = new_variable_weight_gas
+            self.gas_fixed_weight = new_fixed_weight_gas
 
             self.electricity_variable_rate = new_levy_var_elec
             self.electricity_fixed_rate = new_levy_fixed_elec
@@ -125,8 +133,10 @@ class Levy:
             new_levy.gas_weight = new_gas_weight
             new_levy.tax_weight = new_tax_weight
 
-            new_levy.variable_weight = new_variable_weight
-            new_levy.fixed_weight = new_fixed_weight
+            new_levy.electricity_variable_weight = new_variable_weight_elec
+            new_levy.electricity_fixed_weight = new_fixed_weight_elec
+            new_levy.gas_variable_weight = new_variable_weight_gas
+            new_levy.gas_fixed_weight = new_fixed_weight_gas
 
             new_levy.electricity_variable_rate = new_levy_var_elec
             new_levy.electricity_fixed_rate = new_levy_fixed_elec
@@ -191,8 +201,10 @@ class RO(Levy):
         electricity_weight,
         gas_weight,
         tax_weight,
-        variable_weight,
-        fixed_weight,
+        electricity_variable_weight,
+        electricity_fixed_weight,
+        gas_variable_weight,
+        gas_fixed_weight,
         electricity_variable_rate,
         electricity_fixed_rate,
         gas_variable_rate,
@@ -212,8 +224,10 @@ class RO(Levy):
             electricity_weight,
             gas_weight,
             tax_weight,
-            variable_weight,
-            fixed_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
             electricity_variable_rate,
             electricity_fixed_rate,
             gas_variable_rate,
@@ -256,8 +270,10 @@ class RO(Levy):
             electricity_weight=1,
             gas_weight=0,
             tax_weight=0,
-            variable_weight=1,
-            fixed_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=0,
+            gas_fixed_weight=0,
             electricity_variable_rate=ro_levy,
             electricity_fixed_rate=0,
             gas_variable_rate=0,
@@ -291,8 +307,10 @@ class AAHEDC(Levy):
         electricity_weight,
         gas_weight,
         tax_weight,
-        variable_weight,
-        fixed_weight,
+        electricity_variable_weight,
+        electricity_fixed_weight,
+        gas_variable_weight,
+        gas_fixed_weight,
         electricity_variable_rate,
         electricity_fixed_rate,
         gas_variable_rate,
@@ -311,8 +329,10 @@ class AAHEDC(Levy):
             electricity_weight,
             gas_weight,
             tax_weight,
-            variable_weight,
-            fixed_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
             electricity_variable_rate,
             electricity_fixed_rate,
             gas_variable_rate,
@@ -367,8 +387,10 @@ class AAHEDC(Levy):
             electricity_weight=1,
             gas_weight=0,
             tax_weight=0,
-            variable_weight=1,
-            fixed_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=0,
+            gas_fixed_weight=0,
             electricity_variable_rate=aahedc_levy,
             electricity_fixed_rate=0,
             gas_variable_rate=0,
@@ -405,8 +427,10 @@ class GGL(Levy):
         electricity_weight,
         gas_weight,
         tax_weight,
-        variable_weight,
-        fixed_weight,
+        electricity_variable_weight,
+        electricity_fixed_weight,
+        gas_variable_weight,
+        gas_fixed_weight,
         electricity_variable_rate,
         electricity_fixed_rate,
         gas_variable_rate,
@@ -424,8 +448,10 @@ class GGL(Levy):
             electricity_weight,
             gas_weight,
             tax_weight,
-            variable_weight,
-            fixed_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
             electricity_variable_rate,
             electricity_fixed_rate,
             gas_variable_rate,
@@ -462,8 +488,10 @@ class GGL(Levy):
             electricity_weight=0,
             gas_weight=1,
             tax_weight=0,
-            variable_weight=0,
-            fixed_weight=1,
+            electricity_variable_weight=0,
+            electricity_fixed_weight=0,
+            gas_variable_weight=0,
+            gas_fixed_weight=1,
             electricity_variable_rate=0,
             electricity_fixed_rate=0,
             gas_variable_rate=0,
@@ -493,8 +521,10 @@ class WHD(Levy):
         electricity_weight,
         gas_weight,
         tax_weight,
-        variable_weight,
-        fixed_weight,
+        electricity_variable_weight,
+        electricity_fixed_weight,
+        gas_variable_weight,
+        gas_fixed_weight,
         electricity_variable_rate,
         electricity_fixed_rate,
         gas_variable_rate,
@@ -515,8 +545,10 @@ class WHD(Levy):
             electricity_weight,
             gas_weight,
             tax_weight,
-            variable_weight,
-            fixed_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
             electricity_variable_rate,
             electricity_fixed_rate,
             gas_variable_rate,
@@ -561,8 +593,10 @@ class WHD(Levy):
             electricity_weight=0.5,
             gas_weight=0.5,
             tax_weight=0,
-            variable_weight=0,
-            fixed_weight=1,
+            electricity_variable_weight=0,
+            electricity_fixed_weight=1,
+            gas_variable_weight=0,
+            gas_fixed_weight=1,
             electricity_variable_rate=0,
             electricity_fixed_rate=whd_levy,
             gas_variable_rate=0,
@@ -608,8 +642,10 @@ class ECO(Levy):
         electricity_weight,
         gas_weight,
         tax_weight,
-        variable_weight,
-        fixed_weight,
+        electricity_variable_weight,
+        electricity_fixed_weight,
+        gas_variable_weight,
+        gas_fixed_weight,
         electricity_variable_rate,
         electricity_fixed_rate,
         gas_variable_rate,
@@ -635,8 +671,10 @@ class ECO(Levy):
             electricity_weight,
             gas_weight,
             tax_weight,
-            variable_weight,
-            fixed_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
             electricity_variable_rate,
             electricity_fixed_rate,
             gas_variable_rate,
@@ -703,8 +741,10 @@ class ECO(Levy):
             electricity_weight=0.5,
             gas_weight=0.5,
             tax_weight=0,
-            variable_weight=1,
-            fixed_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=1,
+            gas_fixed_weight=0,
             electricity_variable_rate=eco_levy_elec,
             electricity_fixed_rate=0,
             gas_variable_rate=eco_levy_gas,
@@ -768,8 +808,10 @@ class FIT(Levy):
         electricity_weight,
         gas_weight,
         tax_weight,
-        variable_weight,
-        fixed_weight,
+        electricity_variable_weight,
+        electricity_fixed_weight,
+        gas_variable_weight,
+        gas_fixed_weight,
         electricity_variable_rate,
         electricity_fixed_rate,
         gas_variable_rate,
@@ -790,8 +832,10 @@ class FIT(Levy):
             electricity_weight,
             gas_weight,
             tax_weight,
-            variable_weight,
-            fixed_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
             electricity_variable_rate,
             electricity_fixed_rate,
             gas_variable_rate,
@@ -833,8 +877,10 @@ class FIT(Levy):
             electricity_weight=1,
             gas_weight=0,
             tax_weight=0,
-            variable_weight=1,
-            fixed_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=0,
+            gas_fixed_weight=0,
             electricity_variable_rate=fit_levy,
             electricity_fixed_rate=0,
             gas_variable_rate=0,
