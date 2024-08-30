@@ -209,7 +209,7 @@ class Levy:
             revenue_tax,
             self.revenue,
         ):
-            raise ValueError("Rebalancing failed to maintain revenue.")
+            raise ValueError("Rebalancing failed to maintain revenue. (Try: Check that new electricity-gas-tax and fixed-variable weights provided add up to 1, respectively.)")
 
         if inplace:
             # Update attributes
