@@ -3,7 +3,23 @@ from typing import Dict, Optional
 
 
 def _sum_levies(val: float, summary: str, fuel: str, levies: list) -> float:
-    """Calculate sum of levies."""
+    """Calculate sum of levies.
+
+    Parameters
+    ----------
+    val : float
+        Gas or electricity consumption value.
+    summary : str
+        Charging basis, can be 'fixed' or 'variable'.
+    fuel : str
+        Fuel type, can be 'gas' or 'electricity'.
+    levies : list
+        Collection of levies used to estimate policy costs.
+    Returns
+    -------
+    float
+        Policy cost component value for charging basis and fuel type given.
+    """
     if val == 0:
         return 0.0
     else:
