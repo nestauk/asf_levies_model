@@ -1229,7 +1229,7 @@ value can also be provided if a different value is required.
         Args:
             df: a dataframe with ChargeRestrictionPeriod1, ChargeRestrictionPeriod2, \
 LookupPeriod, InflatedLevelisationFund, TotalElectricitySupplied, ExemptSupplyOutsideUK, \
-ExemptSupplyEII fields.
+ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fields.
             revenue: float, a total revenue amount (£) for the levy.
         """
         # get latest fit values from df
