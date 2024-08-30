@@ -53,7 +53,7 @@ def _calculate_policy_costs(
     Parameters
     ----------
     levies : list
-        Collection of levies used to estiamte policy costs.
+        Collection of levies used to estimate policy costs.
     consumption_values_df : pd.DataFrame
         Dataframe of energy use profiles.
     consumption_profile_column : str
