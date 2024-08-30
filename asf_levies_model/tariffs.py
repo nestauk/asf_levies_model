@@ -99,7 +99,7 @@ class Tariff:
             levelisation: float, levelisation.
         """
         self.name = name
-        self.short_name = (short_name,)
+        self.short_name = short_name
         self.fuel = fuel
         self.df_nil = df_nil
         self.cm_nil = cm_nil
