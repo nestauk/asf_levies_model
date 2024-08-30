@@ -130,7 +130,7 @@ class Levy:
             + self.gas_variable_rate * gas_consumption
         )
 
-    def calculate_fixed_levy(self, electricity_customer: bool, gas_customer: bool):
+    def calculate_fixed_levy(self, electricity_customer: bool, gas_customer: bool) -> float:
         """Calculate fixed component of levy for given customers.
 
         Args:
