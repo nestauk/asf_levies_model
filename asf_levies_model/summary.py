@@ -98,13 +98,24 @@ def _calculate_policy_costs(
         summary_cols.append(
             df[[gas_column, electricity_column]]
             .apply(
-                lambda x: sum(
-                    [
-                        levy.calculate_levy(
-                            x[electricity_column], x[gas_column], True, True
-                        )
-                        for levy in levies
-                    ]
+                lambda x: (
+                    sum(
+                        [
+                            levy.calculate_levy(
+                                x[electricity_column], x[gas_column], True, True
+                            )
+                            for levy in levies
+                        ]
+                    )
+                    if x[gas_column] != 0
+                    else sum(
+                        [
+                            levy.calculate_levy(
+                                x[electricity_column], x[gas_column], True, False
+                            )
+                            for levy in levies
+                        ]
+                    )
                 ),
                 axis=1,
             )
@@ -122,7 +133,7 @@ def _calculate_policy_costs(
 
 
 def _rebalance_levies(
-    levies: list, rebalancing_weights: dict, levy_denominators: dict
+    levies: list, rebalancing_weights: dict, levy_denominators: dict, scenario_name: str
 ) -> list:
     """Generates a list of rebalanced levies according to provided weights and denominators.
 
@@ -131,9 +142,11 @@ def _rebalance_levies(
     levies : list
         Collection of levies to be rebalanced.
     rebalancing_weights : dict
-        A dictionary of weights that describe the rebalancing required.
+        A dictionary of scenario dictionaries containing weights that describe the rebalancing required.
     levy_denominators : dict
         A dictionary of denominators for reapportioning revenue subject to rebalancing.
+    scenario_name : str
+        Name of rebalancing scenario.
 
     Returns
     -------
@@ -141,7 +154,10 @@ def _rebalance_levies(
         A list of rebalanced levies.
     """
     rebalanced_levies = [
-        levy.rebalance_levy(**rebalancing_weights, **levy_denominators[levy.short_name])
+        levy.rebalance_levy(
+            **rebalancing_weights.get(scenario_name).get(levy.short_name),
+            **levy_denominators[levy.short_name],
+        )
         for levy in levies
     ]
     return rebalanced_levies
@@ -225,8 +241,10 @@ It is assumed that the rebalancing weights are the same for each levy.
         )
 
     scenarios = []
-    for scenario, weights in rebalancing_weights.items():
-        new_levies = _rebalance_levies(levies, weights, levy_denominators)
+    for scenario in rebalancing_weights.keys():
+        new_levies = _rebalance_levies(
+            levies, rebalancing_weights, levy_denominators, scenario
+        )
         scenarios.append(
             _calculate_policy_costs(
                 new_levies,
