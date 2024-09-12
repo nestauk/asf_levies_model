@@ -1,7 +1,7 @@
 import datetime
 import numpy as np
 import pandas as pd
-import pandera as pa
+#import pandera as pa
 import re
 import warnings
 import zipfile
