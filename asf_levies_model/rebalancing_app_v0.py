@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import tempfile
 
 from asf_levies_model.getters.load_data import (
     download_annex_4,
@@ -21,32 +22,34 @@ st.title("Policy cost levies rebalancing model V1")
 
 # Download Annex 4 data
 st.subheader("**Downloading latest Ofgem policy cost data 🗃️**", divider=True)
-url = "https://www.ofgem.gov.uk/sites/default/files/2024-08/Annex_4_-_Policy_cost_allowance_methodology_v1.19 (1).xlsx"
-with st.spinner("Downloading latest Ofgem policy cost data..."):
-    download_annex_4(url)
-st.success("Latest policy cost data downloaded!")
 
-# Load energy consumption profiles
-ofgem_archetypes_df = ofgem_archetypes_data()
+with tempfile.TemporaryDirectory() as tmpdir:
+    url = "https://www.ofgem.gov.uk/sites/default/files/2024-08/Annex_4_-_Policy_cost_allowance_methodology_v1.19 (1).xlsx"
+    with st.spinner("Downloading latest Ofgem policy cost data..."):
+        download_annex_4(url, tmpdir)
+    st.success("Latest policy cost data downloaded!")
 
-# Initialise existing levies
-levies = [
-    RO.from_dataframe(
-        process_data_RO(), denominator=94_200_366
-    ),  # domestic denominator
-    AAHEDC.from_dataframe(
-        process_data_AAHEDC(), denominator=94_200_366
-    ),  # domestic denominator
-    GGL.from_dataframe(
-        process_data_GGL(), denominator=24_503_683
-    ),  # domestic denominator
-    WHD.from_dataframe(process_data_WHD()),  # domestic only levy
-    ECO.from_dataframe(process_data_ECO()),  # domestic only levy
-    FIT.from_dataframe(
-        process_data_FIT(),
-        revenue=689_233_317,  # This revenue is the domestic share based on domestic electricity supply/total elligible supply.
-    ),
-]
+    # Load energy consumption profiles
+    ofgem_archetypes_df = ofgem_archetypes_data()
+
+    # Initialise existing levies
+    levies = [
+        RO.from_dataframe(
+            process_data_RO(), denominator=94_200_366
+        ),  # domestic denominator
+        AAHEDC.from_dataframe(
+            process_data_AAHEDC(), denominator=94_200_366
+        ),  # domestic denominator
+        GGL.from_dataframe(
+            process_data_GGL(), denominator=24_503_683
+        ),  # domestic denominator
+        WHD.from_dataframe(process_data_WHD()),  # domestic only levy
+        ECO.from_dataframe(process_data_ECO()),  # domestic only levy
+        FIT.from_dataframe(
+            process_data_FIT(),
+            revenue=689_233_317,  # This revenue is the domestic share based on domestic electricity supply/total elligible supply.
+        ),
+    ]
 
 
 # Take rebalancing scenario name

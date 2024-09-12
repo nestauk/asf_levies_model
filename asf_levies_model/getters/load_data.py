@@ -1,7 +1,8 @@
 import datetime
 import numpy as np
 import pandas as pd
-#import pandera as pa
+
+# import pandera as pa
 import re
 import warnings
 import zipfile
@@ -11,18 +12,22 @@ from requests.sessions import Session
 from requests import RequestException
 from typing import List
 
-from asf_levies_model import PROJECT_DIR
+# from asf_levies_model import PROJECT_DIR
+from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parents[2]
 
 # Functions for getting and processing Annex 4 data
 
 
-def download_annex_4(url: str) -> None:
+def download_annex_4(url: str, data_root: str = None) -> None:
     """Retrieves file from Ofgem website and saves to file."""
     with Session() as session:
         try:
             response = session.get(url)
             date = datetime.datetime.now().strftime("%Y%m%d")
-            data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+            if not data_root:
+                data_root = f"{PROJECT_DIR}/inputs/data/raw/"
             with open(f"{data_root}{date}_ofgem_annex_4.xlsx", mode="wb") as file:
                 file.write(response.content)
             print("File retrieved successfully.")
