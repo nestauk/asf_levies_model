@@ -421,7 +421,7 @@ def _get_raw_dataframe_annex9(data_name: str) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-def slice_tariff_components_tables(
+def _slice_tariff_components_tables(
     sheet_start_row: int, levelisation: bool
 ) -> pd.DataFrame:
     """Extracts tariff components tables of interest from Annex 9 tab "1c Consumption adjusted levels".
@@ -457,7 +457,7 @@ def slice_tariff_components_tables(
     return tariff_tables_df
 
 
-def extract_single_tariff_table(
+def _extract_single_tariff_table(
     input_df: pd.DataFrame,
     type_of_consumption: str,
     table_number: int,
@@ -509,7 +509,9 @@ def extract_single_tariff_table(
     return single_tariff_table_df
 
 
-def tidy_tariff_table(input_df: pd.DataFrame, type_of_consumption: str) -> pd.DataFrame:
+def _tidy_tariff_table(
+    input_df: pd.DataFrame, type_of_consumption: str
+) -> pd.DataFrame:
     """Generates a dataframe for tariff components for one fuel type-payment method in tidy format.
 
     Parameters
@@ -537,3 +539,393 @@ def tidy_tariff_table(input_df: pd.DataFrame, type_of_consumption: str) -> pd.Da
     )
 
     return tidy_df
+
+
+def ofgem_archetypes_data() -> pd.DataFrame:
+    """Pre-filled function to generate a dataframe with Ofgem archetype data."""
+    dataframe = pd.concat(
+        [
+            pd.Series(
+                [
+                    "Typical",
+                    "A1",
+                    "A2",
+                    "A3",
+                    "B4",
+                    "B5",
+                    "B6",
+                    "C7",
+                    "C8",
+                    "C9",
+                    "D10",
+                    "D11",
+                    "D12",
+                    "E13",
+                    "E14",
+                    "F15",
+                    "F16",
+                    "G17",
+                    "G18",
+                    "H19",
+                    "H20",
+                    "I21",
+                    "I22",
+                    "J23",
+                    "J24",
+                ],
+                name="AnnualConsumptionProfile",
+            ),
+            pd.Series(
+                [
+                    2700.0,
+                    2742.0,
+                    2849.0,
+                    3519.0,
+                    4811.0,
+                    6597.0,
+                    3028.0,
+                    3649.0,
+                    5587.0,
+                    3337.0,
+                    3881.0,
+                    2482.0,
+                    3952.0,
+                    5075.0,
+                    4070.0,
+                    6883.0,
+                    4317.0,
+                    5901.0,
+                    5294.0,
+                    4907.0,
+                    3143.0,
+                    4070.0,
+                    4684.0,
+                    4532.0,
+                    7523.0,
+                ],
+                name="ElectricitySingleRatekWh",
+            ),
+            pd.Series(
+                [
+                    11500.0,
+                    10933.0,
+                    9464.0,
+                    10622.0,
+                    0.0,
+                    0.0,
+                    10525.0,
+                    13119.0,
+                    0.0,
+                    13685.0,
+                    13981.0,
+                    8782.0,
+                    16065.0,
+                    16722.0,
+                    14606.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    11677.0,
+                    15461.0,
+                    18530.0,
+                    16330.0,
+                    0.0,
+                ],
+                name="GaskWh",
+            ),
+            pd.Series(
+                [
+                    None,
+                    15643,
+                    17327,
+                    18195,
+                    18776,
+                    22423,
+                    24869,
+                    29257,
+                    32240,
+                    32344,
+                    31819,
+                    40980,
+                    38927,
+                    38351,
+                    43026,
+                    46005,
+                    50721,
+                    44586,
+                    49265,
+                    52621,
+                    58924,
+                    59668,
+                    68332,
+                    74795,
+                    78813,
+                ],
+                name="GrossAnnualHouseholdIncome",
+            ),
+            pd.Series(
+                [
+                    "Typical",
+                    "Oldest and poorest",
+                    "Low-income older people in social housing",
+                    "Low-income adults with disability in social housing",
+                    "Old poor people with electric heating",
+                    "Pensioners with medical  equipment and/or electric heating",
+                    "Low-income couples/singles in small rented/social housing",
+                    "Council housing with children",
+                    "Electric council housing with 1 child",
+                    "Pensioners in semi-detached houses",
+                    "Disabled owner-occupiers",
+                    "Flats with good EPC",
+                    "Pensioners in mansions",
+                    "Families with disabilities",
+                    "Average families",
+                    "Mid income large families on other fuel",
+                    "Electric yuppies",
+                    "Welsh barns",
+                    "Other fuels",
+                    "Oil rural older couples",
+                    "High income without children",
+                    "High income families with 1 child",
+                    "Own detached houses with no children",
+                    "High income families with 2+ children",
+                    "Big rich rural homes with children",
+                ],
+                name="ArchetypeNickname",
+            ),
+            pd.Series(
+                [
+                    1_000_000,
+                    578_333,
+                    868_191,
+                    883_413,
+                    731_318,
+                    465_288,
+                    920_172,
+                    659_595,
+                    228_477,
+                    3_408_514,
+                    1_163_946,
+                    1_197_075,
+                    1_457_829,
+                    690_892,
+                    1_178_684,
+                    323_433,
+                    989_639,
+                    163_166,
+                    667_836,
+                    675_712,
+                    3_540_270,
+                    2_210_494,
+                    1_792_593,
+                    1_956_103,
+                    231_658,
+                ],
+                name="ArchetypeSize",
+            ),
+            pd.Series(
+                [
+                    "Gas",  # Typical
+                    "Gas",  # A1
+                    "Gas",  # A2
+                    "Gas",  # A3
+                    "Electricity",  # B4
+                    "Electricity/Other",  # B5
+                    "Gas",  # B6
+                    "Gas",  # C7
+                    "Electricity",  # C8
+                    "Gas",  # C9
+                    "Gas",  # D10
+                    "Gas",  # D11
+                    "Gas",  # D12
+                    "Gas",  # E13
+                    "Gas",  # E14
+                    "Electricity/Other",  # F15
+                    "Electricity",  # F16
+                    "Other",  # G17
+                    "Other",  # G18
+                    "Other",  # H19
+                    "Gas",  # H20
+                    "Gas",  # I21
+                    "Gas",  # I22
+                    "Gas",  # J23
+                    "Other",  # J24
+                ],
+                name="ArchetypeHeatingFuel",
+            ),
+        ],
+        axis=1,
+    )
+    return dataframe
+
+
+def _process_tariff(
+    sheet_start_row: int,
+    levelisation: bool,
+    type_of_consumption: str,
+    table_number: int,
+) -> pd.DataFrame:
+    """Generic function for returning processed tariff component data from annex 9.
+
+    Parameters
+    ----------
+    sheet_start_row : int
+        Row number of header row in target tables in sheet "1c Consumption adjusted levels".
+    levelisation : bool
+        Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
+    type_of_consumption : str
+        "Nil consumption" or "Typical consumption" ONLY.
+    table_number : int
+       1: Electricity single-rate; 2: Electricity multi-register; 3: Gas; 4: Duel fuel
+    """
+    return _tidy_tariff_table(
+        _extract_single_tariff_table(
+            _slice_tariff_components_tables(sheet_start_row, levelisation),
+            type_of_consumption,
+            table_number,
+        ),
+        type_of_consumption,
+    )
+
+
+## Standard Credit
+# Electricity
+def process_tariff_elec_standard_credit_nil():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 55
+    levelisation = False
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_elec_standard_credit_typical():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 70
+    levelisation = False
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+# Gas
+def process_tariff_gas_standard_credit_nil():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 55
+    levelisation = False
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_gas_standard_credit_typical():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 70
+    levelisation = False
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+## Other payment method
+# Electricity
+def process_tariff_elec_other_payment_nil():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 19
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_elec_other_payment_typical():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 35
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+# Gas
+def process_tariff_gas_other_payment_nil():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 19
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_gas_other_payment_typical():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 35
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+## PPM
+# Electricity
+def process_tariff_elec_ppm_nil():
+    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 88
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_elec_ppm_typical():
+    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 104
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+# Gas
+def process_tariff_gas_ppm_nil():
+    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 88
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_gas_ppm_typical():
+    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 104
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
