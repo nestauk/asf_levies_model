@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 import tempfile
 
-from asf_levies_model.getters.load_data import (
+from getters.load_data import (
     download_annex_4,
     process_data_RO,
     process_data_AAHEDC,
@@ -14,9 +14,9 @@ from asf_levies_model.getters.load_data import (
     ofgem_archetypes_data,
 )
 
-from asf_levies_model.levies import RO, AAHEDC, GGL, WHD, ECO, FIT
+from levies import RO, AAHEDC, GGL, WHD, ECO, FIT
 
-from asf_levies_model.summary import process_rebalancing_scenarios
+from summary import process_rebalancing_scenarios
 
 st.title("Policy cost levies rebalancing model V1")
 
