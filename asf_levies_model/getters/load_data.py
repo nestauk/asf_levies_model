@@ -27,8 +27,9 @@ def download_annex_4(url: str, data_root: str = None) -> None:
             response = session.get(url)
             date = datetime.datetime.now().strftime("%Y%m%d")
             if not data_root:
-                data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-            with open(f"{data_root}{date}_ofgem_annex_4.xlsx", mode="wb") as file:
+                data_root = f"{PROJECT_DIR}/inputs/data/raw"
+            print(data_root)
+            with open(f"{data_root}/{date}_ofgem_annex_4.xlsx", mode="wb") as file:
                 file.write(response.content)
             print("File retrieved successfully.")
         except RequestException as rex:
@@ -58,17 +59,18 @@ def _get_excel_sheet_names(file_path: str) -> list:
     return sheets
 
 
-def _get_raw_dataframe_annex4(policy_name: str) -> pd.DataFrame:
+def _get_raw_dataframe_annex4(policy_name: str, data_root: str = None) -> pd.DataFrame:
     """Creates a pandas dataframe of raw data from Ofgem Annex 4
     spreadsheet tab corresponding to policy of interest."""
     date = datetime.datetime.now()
-    data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-    latest_annex_4 = _find_latest_annex(data_root, 4)
+    if not data_root:
+        data_root = f"{PROJECT_DIR}/inputs/data/raw"
+    latest_annex_4 = _find_latest_annex(data_root + "/", 4)
     if (
         day_diff := (date - datetime.datetime.strptime(latest_annex_4, "%Y%m%d")).days
     ) > 7:
         warnings.warn(f"Using copy of Annex 4 downloaded {day_diff} days ago.")
-    filepath = f"{data_root}{latest_annex_4}_ofgem_annex_4.xlsx"
+    filepath = f"{data_root}/{latest_annex_4}_ofgem_annex_4.xlsx"
     try:
         sheet = [
             sheet_name
@@ -145,11 +147,14 @@ def _extract_policy_data(
 
 
 def _process_data(
-    policy_acronym: str, policy_parameters: list, column_names: list
+    policy_acronym: str,
+    policy_parameters: list,
+    column_names: list,
+    data_root: str = None,
 ) -> pd.DataFrame:
     """Generic function for returning processed annex 4 data."""
     # Create dataframe of raw RO data from spreadsheet tab
-    df = _get_raw_dataframe_annex4(policy_acronym)
+    df = _get_raw_dataframe_annex4(policy_acronym, data_root)
     # Create list of update dates
     update_dates = _get_update_dates(df)
     # Create list of charging years
@@ -175,7 +180,7 @@ def _process_data(
     return data_tidy_df
 
 
-def process_data_RO() -> pd.DataFrame:
+def process_data_RO(data_root: str = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding RO tab in annex 4 into tidy format."""
     parameters = [
         "Obligation level for scheme year",
@@ -189,10 +194,10 @@ def process_data_RO() -> pd.DataFrame:
         "BuyOutPricePreviousYear",
         "ForecastAnnualRPIPreviousYear",
     ]
-    return _process_data("RO", parameters, names)
+    return _process_data("RO", parameters, names, data_root)
 
 
-def process_data_WHD() -> pd.DataFrame:
+def process_data_WHD(data_root: str = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding WHD tab in annex 4 into tidy format."""
     parameters = [
         "Target spending for scheme year",
@@ -208,10 +213,10 @@ def process_data_WHD() -> pd.DataFrame:
         "ObligatedSuppliersCustomerBase",
         "CompulsorySupplierFractionOfCoreGroup",
     ]
-    return _process_data("WHD", parameters, names)
+    return _process_data("WHD", parameters, names, data_root)
 
 
-def process_data_AAHEDC() -> pd.DataFrame:
+def process_data_AAHEDC(data_root: str = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding AAHEDC tab in annex 4 into tidy format."""
     parameters = [
         "Final AAHEDC tariff for current charging year",
@@ -219,17 +224,17 @@ def process_data_AAHEDC() -> pd.DataFrame:
         "Forecast of annual RPI for previous charging year",
     ]
     names = ["TariffCurrentYear", "TariffPreviousYear", "ForecastAnnualRPIPreviousYear"]
-    return _process_data("AAHEDC", parameters, names)
+    return _process_data("AAHEDC", parameters, names, data_root)
 
 
-def process_data_GGL() -> pd.DataFrame:
+def process_data_GGL(data_root: str = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding GGL tab in annex 4 into tidy format."""
     parameters = ["Levy rate", "Backdated levy rate for first scheme year"]
     names = ["LevyRate", "BackdatedLevyRate"]
-    return _process_data("GGL", parameters, names)
+    return _process_data("GGL", parameters, names, data_root)
 
 
-def process_data_ECO() -> pd.DataFrame:
+def process_data_ECO(data_root: str = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding ECO tab in annex 4 into tidy format."""
     parameters = [
         "Annualised costs for scheme year attributed to gas - ECO4",
@@ -255,7 +260,7 @@ def process_data_ECO() -> pd.DataFrame:
         "ObligatedSupplierVolumeElectricity",
     ]
 
-    eco_df = _process_data("ECO", parameters, names)
+    eco_df = _process_data("ECO", parameters, names, data_root)
 
     # Manually fix apparent typo if present in data.
     if (eco_df["UpdateDate"] == "2022-02-01").sum() == 2:
@@ -333,10 +338,10 @@ def _extract_FIT_policy_data(
     return policy_df.loc[parameter_row_index, parameter_col_index].to_numpy()
 
 
-def process_data_FIT() -> pd.DataFrame:
+def process_data_FIT(data_root: str = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding New FIT tab in annex 4 into tidy format."""
     # Create dataframe of raw FIT data from spreadsheet tab
-    FIT_df = _get_raw_dataframe_annex4("New FIT")
+    FIT_df = _get_raw_dataframe_annex4("New FIT", data_root)
     # Create list of 28AD charge restriction periods (Table 5)
     charge_periods = _get_charging_periods(FIT_df)
     charge_periods_1 = charge_periods[0]

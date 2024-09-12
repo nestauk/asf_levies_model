@@ -35,18 +35,18 @@ with tempfile.TemporaryDirectory() as tmpdir:
     # Initialise existing levies
     levies = [
         RO.from_dataframe(
-            process_data_RO(), denominator=94_200_366
+            process_data_RO(tmpdir), denominator=94_200_366
         ),  # domestic denominator
         AAHEDC.from_dataframe(
-            process_data_AAHEDC(), denominator=94_200_366
+            process_data_AAHEDC(tmpdir), denominator=94_200_366
         ),  # domestic denominator
         GGL.from_dataframe(
-            process_data_GGL(), denominator=24_503_683
+            process_data_GGL(tmpdir), denominator=24_503_683
         ),  # domestic denominator
-        WHD.from_dataframe(process_data_WHD()),  # domestic only levy
-        ECO.from_dataframe(process_data_ECO()),  # domestic only levy
+        WHD.from_dataframe(process_data_WHD(tmpdir)),  # domestic only levy
+        ECO.from_dataframe(process_data_ECO(tmpdir)),  # domestic only levy
         FIT.from_dataframe(
-            process_data_FIT(),
+            process_data_FIT(tmpdir),
             revenue=689_233_317,  # This revenue is the domestic share based on domestic electricity supply/total elligible supply.
         ),
     ]
