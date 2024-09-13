@@ -501,11 +501,14 @@ def _extract_single_tariff_table(
     # Table without first row
     single_tariff_table_df = single_tariff_table_df.iloc[1:, :]
     # Replace "-" with na
-    single_tariff_table_df = single_tariff_table_df.replace(
-        "[\u002D\u058A\u05BE\u1400\u1806\u2010-\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D]",
-        None,
-        regex=True,
-    )
+    with warnings.catch_warnings():
+        # Suppress Future warning for replace.
+        warnings.simplefilter("ignore")
+        single_tariff_table_df = single_tariff_table_df.replace(
+            "[\u002D\u058A\u05BE\u1400\u1806\u2010-\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D]",
+            None,
+            regex=True,
+        )
     return single_tariff_table_df
 
 
@@ -531,12 +534,16 @@ def _tidy_tariff_table(
         id_vars=type_of_consumption, var_name="28AD_Charge_Restriction_Period"
     )
     # Add start and end dates
-    tidy_df["28AD_Charge_Restriction_Period_start"] = pd.to_datetime(
-        tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[0]
-    )
-    tidy_df["28AD_Charge_Restriction_Period_end"] = pd.to_datetime(
-        tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[1]
-    )
+    with warnings.catch_warnings():
+        # Suppress warning for datetime parsing each element individually.
+        # Dates in this table are a mess and this is desired behaviour.
+        warnings.simplefilter("ignore")
+        tidy_df["28AD_Charge_Restriction_Period_start"] = pd.to_datetime(
+            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[0]
+        )
+        tidy_df["28AD_Charge_Restriction_Period_end"] = pd.to_datetime(
+            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[1]
+        )
 
     return tidy_df
 
