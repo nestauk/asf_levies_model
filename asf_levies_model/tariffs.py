@@ -471,3 +471,563 @@ class GasStandardCredit(Tariff):
             hap=typical_latest["HAP"],
             levelisation=None,
         )
+
+
+class ElectricityOtherPayment(Tariff):
+    """Electricity Other Payment Method Tariff.\n"""
+
+    __doc__ += (
+        Tariff.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+"""
+    )
+
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        fuel: str,
+        df_nil: float,
+        cm_nil: float,
+        aa_nil: float,
+        pc_nil: float,
+        nc_nil: float,
+        oc_nil: float,
+        smncc_nil: float,
+        paac_nil: float,
+        pap_nil: float,
+        ebit_nil: float,
+        hap_nil: float,
+        levelisation_nil: float,
+        df: float,
+        cm: float,
+        aa: float,
+        pc: float,
+        nc: float,
+        oc: float,
+        smncc: float,
+        paac: float,
+        pap: float,
+        ebit: float,
+        hap: float,
+        levelisation: float,
+    ) -> None:
+        super(ElectricityOtherPayment, self).__init__(
+            name,
+            short_name,
+            fuel,
+            df_nil,
+            cm_nil,
+            aa_nil,
+            pc_nil,
+            nc_nil,
+            oc_nil,
+            smncc_nil,
+            paac_nil,
+            pap_nil,
+            ebit_nil,
+            hap_nil,
+            levelisation_nil,
+            df,
+            cm,
+            aa,
+            pc,
+            nc,
+            oc,
+            smncc,
+            paac,
+            pap,
+            ebit,
+            hap,
+            levelisation,
+        )
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        nil_df: pd.DataFrame,
+        typical_df: pd.DataFrame,
+        typical_consumption: float = 2.7,
+    ) -> "ElectricityOtherPayment":
+        """Create ElectricityOtherPayment tariff instance from dataframe input.
+
+        `nil_df` and `typical_df` are tidy data tables derived from ofgem annex 9 using functions in \
+`asf_levies_model.getters.load_data`.
+
+        Uses a `typical_consumption` value (default: 2.7 MWh) to create unit rates from typical_df input.
+
+        Args:
+            nil_df: a dataframe with values for nil consumption.
+            typical_df: a dataframe with values for typical consumption.
+            typical_consumption: float, the typical consumption value used in `typical_df`.
+        """
+        # Get latest values from nil and typical dfs.
+        nil_latest = (
+            nil_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Nil consumption")
+            .loc[:, "value"]
+        )
+        typical_latest = (
+            typical_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Typical consumption")
+            .loc[:, "value"]
+        )
+
+        # Get unit costs per MWh
+        typical_latest = (typical_latest - nil_latest.fillna(0)) / typical_consumption
+
+        return cls(
+            name="Other Payment Method. Electricity Single-Rate Metering Arrangement",
+            short_name="Electricity Other Payment",
+            fuel="electricity",
+            df_nil=nil_latest["DF"],
+            cm_nil=nil_latest["CM"],
+            aa_nil=nil_latest["AA"],
+            pc_nil=nil_latest["PC"],
+            nc_nil=nil_latest["NC"],
+            oc_nil=nil_latest["OC"],
+            smncc_nil=nil_latest["SMNCC"],
+            paac_nil=nil_latest["PAAC"],
+            pap_nil=nil_latest["PAP"],
+            ebit_nil=nil_latest["EBIT"],
+            hap_nil=nil_latest["HAP"],
+            levelisation_nil=nil_latest["Levelisation "],
+            df=typical_latest["DF"],
+            cm=typical_latest["CM"],
+            aa=typical_latest["AA"],
+            pc=typical_latest["PC"],
+            nc=typical_latest["NC"],
+            oc=typical_latest["OC"],
+            smncc=typical_latest["SMNCC"],
+            paac=typical_latest["PAAC"],
+            pap=typical_latest["PAP"],
+            ebit=typical_latest["EBIT"],
+            hap=typical_latest["HAP"],
+            levelisation=typical_latest["Levelisation "],
+        )
+
+
+class GasOtherPayment(Tariff):
+    """Gas Other Payment Tariff.\n"""
+
+    __doc__ += (
+        Tariff.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+"""
+    )
+
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        fuel: str,
+        df_nil: float,
+        cm_nil: float,
+        aa_nil: float,
+        pc_nil: float,
+        nc_nil: float,
+        oc_nil: float,
+        smncc_nil: float,
+        paac_nil: float,
+        pap_nil: float,
+        ebit_nil: float,
+        hap_nil: float,
+        levelisation_nil: float,
+        df: float,
+        cm: float,
+        aa: float,
+        pc: float,
+        nc: float,
+        oc: float,
+        smncc: float,
+        paac: float,
+        pap: float,
+        ebit: float,
+        hap: float,
+        levelisation: float,
+    ) -> None:
+        super(GasOtherPayment, self).__init__(
+            name,
+            short_name,
+            fuel,
+            df_nil,
+            cm_nil,
+            aa_nil,
+            pc_nil,
+            nc_nil,
+            oc_nil,
+            smncc_nil,
+            paac_nil,
+            pap_nil,
+            ebit_nil,
+            hap_nil,
+            levelisation_nil,
+            df,
+            cm,
+            aa,
+            pc,
+            nc,
+            oc,
+            smncc,
+            paac,
+            pap,
+            ebit,
+            hap,
+            levelisation,
+        )
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        nil_df: pd.DataFrame,
+        typical_df: pd.DataFrame,
+        typical_consumption: float = 11.5,
+    ) -> "GasOtherPayment":
+        """Create GasOtherPayment tariff instance from dataframe input.
+
+        `nil_df` and `typical_df` are tidy data tables derived from ofgem annex 9 using functions in \
+`asf_levies_model.getters.load_data`.
+
+        Uses a `typical_consumption` value (default: 11.5 MWh) to create unit rates from typical_df input.
+
+        Args:
+            nil_df: a dataframe with values for nil consumption.
+            typical_df: a dataframe with values for typical consumption.
+            typical_consumption: float, the typical consumption value used in `typical_df`.
+        """
+        # Get latest values from nil and typical dfs.
+        nil_latest = (
+            nil_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Nil consumption")
+            .loc[:, "value"]
+        )
+        typical_latest = (
+            typical_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Typical consumption")
+            .loc[:, "value"]
+        )
+
+        # Get unit costs per MWh
+        typical_latest = (typical_latest - nil_latest.fillna(0)) / typical_consumption
+
+        return cls(
+            name="Other Payment Method. Gas",
+            short_name="Gas Other Payment",
+            fuel="gas",
+            df_nil=nil_latest["DF"],
+            cm_nil=nil_latest["CM"],
+            aa_nil=nil_latest["AA"],
+            pc_nil=nil_latest["PC"],
+            nc_nil=nil_latest["NC"],
+            oc_nil=nil_latest["OC"],
+            smncc_nil=nil_latest["SMNCC"],
+            paac_nil=nil_latest["PAAC"],
+            pap_nil=nil_latest["PAP"],
+            ebit_nil=nil_latest["EBIT"],
+            hap_nil=nil_latest["HAP"],
+            levelisation_nil=nil_latest["Levelisation "],
+            df=typical_latest["DF"],
+            cm=typical_latest["CM"],
+            aa=typical_latest["AA"],
+            pc=typical_latest["PC"],
+            nc=typical_latest["NC"],
+            oc=typical_latest["OC"],
+            smncc=typical_latest["SMNCC"],
+            paac=typical_latest["PAAC"],
+            pap=typical_latest["PAP"],
+            ebit=typical_latest["EBIT"],
+            hap=typical_latest["HAP"],
+            levelisation=typical_latest["Levelisation "],
+        )
+
+
+class ElectricityPPM(Tariff):
+    """Electricity PPM Tariff.\n"""
+
+    __doc__ += (
+        Tariff.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+"""
+    )
+
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        fuel: str,
+        df_nil: float,
+        cm_nil: float,
+        aa_nil: float,
+        pc_nil: float,
+        nc_nil: float,
+        oc_nil: float,
+        smncc_nil: float,
+        paac_nil: float,
+        pap_nil: float,
+        ebit_nil: float,
+        hap_nil: float,
+        levelisation_nil: float,
+        df: float,
+        cm: float,
+        aa: float,
+        pc: float,
+        nc: float,
+        oc: float,
+        smncc: float,
+        paac: float,
+        pap: float,
+        ebit: float,
+        hap: float,
+        levelisation: float,
+    ) -> None:
+        super(ElectricityPPM, self).__init__(
+            name,
+            short_name,
+            fuel,
+            df_nil,
+            cm_nil,
+            aa_nil,
+            pc_nil,
+            nc_nil,
+            oc_nil,
+            smncc_nil,
+            paac_nil,
+            pap_nil,
+            ebit_nil,
+            hap_nil,
+            levelisation_nil,
+            df,
+            cm,
+            aa,
+            pc,
+            nc,
+            oc,
+            smncc,
+            paac,
+            pap,
+            ebit,
+            hap,
+            levelisation,
+        )
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        nil_df: pd.DataFrame,
+        typical_df: pd.DataFrame,
+        typical_consumption: float = 2.7,
+    ) -> "ElectricityPPM":
+        """Create ElectricityPPM tariff instance from dataframe input.
+
+        `nil_df` and `typical_df` are tidy data tables derived from ofgem annex 9 using functions in \
+`asf_levies_model.getters.load_data`.
+
+        Uses a `typical_consumption` value (default: 2.7 MWh) to create unit rates from typical_df input.
+
+        Args:
+            nil_df: a dataframe with values for nil consumption.
+            typical_df: a dataframe with values for typical consumption.
+            typical_consumption: float, the typical consumption value used in `typical_df`.
+        """
+        # Get latest values from nil and typical dfs.
+        nil_latest = (
+            nil_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Nil consumption")
+            .loc[:, "value"]
+        )
+        typical_latest = (
+            typical_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Typical consumption")
+            .loc[:, "value"]
+        )
+
+        # Get unit costs per MWh
+        typical_latest = (typical_latest - nil_latest.fillna(0)) / typical_consumption
+
+        return cls(
+            name="PPM. Electricity Single-Rate Metering Arrangement",
+            short_name="Electricity PPM",
+            fuel="electricity",
+            df_nil=nil_latest["DF"],
+            cm_nil=nil_latest["CM"],
+            aa_nil=nil_latest["AA"],
+            pc_nil=nil_latest["PC"],
+            nc_nil=nil_latest["NC"],
+            oc_nil=nil_latest["OC"],
+            smncc_nil=nil_latest["SMNCC"],
+            paac_nil=nil_latest["PAAC"],
+            pap_nil=nil_latest["PAP"],
+            ebit_nil=nil_latest["EBIT"],
+            hap_nil=nil_latest["HAP"],
+            levelisation_nil=nil_latest["Levelisation "],
+            df=typical_latest["DF"],
+            cm=typical_latest["CM"],
+            aa=typical_latest["AA"],
+            pc=typical_latest["PC"],
+            nc=typical_latest["NC"],
+            oc=typical_latest["OC"],
+            smncc=typical_latest["SMNCC"],
+            paac=typical_latest["PAAC"],
+            pap=typical_latest["PAP"],
+            ebit=typical_latest["EBIT"],
+            hap=typical_latest["HAP"],
+            levelisation=typical_latest["Levelisation "],
+        )
+
+
+class GasPPM(Tariff):
+    """Gas PPM Tariff.\n"""
+
+    __doc__ += (
+        Tariff.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+"""
+    )
+
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        fuel: str,
+        df_nil: float,
+        cm_nil: float,
+        aa_nil: float,
+        pc_nil: float,
+        nc_nil: float,
+        oc_nil: float,
+        smncc_nil: float,
+        paac_nil: float,
+        pap_nil: float,
+        ebit_nil: float,
+        hap_nil: float,
+        levelisation_nil: float,
+        df: float,
+        cm: float,
+        aa: float,
+        pc: float,
+        nc: float,
+        oc: float,
+        smncc: float,
+        paac: float,
+        pap: float,
+        ebit: float,
+        hap: float,
+        levelisation: float,
+    ) -> None:
+        super(GasPPM, self).__init__(
+            name,
+            short_name,
+            fuel,
+            df_nil,
+            cm_nil,
+            aa_nil,
+            pc_nil,
+            nc_nil,
+            oc_nil,
+            smncc_nil,
+            paac_nil,
+            pap_nil,
+            ebit_nil,
+            hap_nil,
+            levelisation_nil,
+            df,
+            cm,
+            aa,
+            pc,
+            nc,
+            oc,
+            smncc,
+            paac,
+            pap,
+            ebit,
+            hap,
+            levelisation,
+        )
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        nil_df: pd.DataFrame,
+        typical_df: pd.DataFrame,
+        typical_consumption: float = 11.5,
+    ) -> "GasPPM":
+        """Create GasPPM tariff instance from dataframe input.
+
+        `nil_df` and `typical_df` are tidy data tables derived from ofgem annex 9 using functions in \
+`asf_levies_model.getters.load_data`.
+
+        Uses a `typical_consumption` value (default: 11.5 MWh) to create unit rates from typical_df input.
+
+        Args:
+            nil_df: a dataframe with values for nil consumption.
+            typical_df: a dataframe with values for typical consumption.
+            typical_consumption: float, the typical consumption value used in `typical_df`.
+        """
+        # Get latest values from nil and typical dfs.
+        nil_latest = (
+            nil_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Nil consumption")
+            .loc[:, "value"]
+        )
+        typical_latest = (
+            typical_df.loc[
+                lambda df: df["28AD_Charge_Restriction_Period_start"]
+                == df["28AD_Charge_Restriction_Period_start"].max()
+            ]
+            .set_index("Typical consumption")
+            .loc[:, "value"]
+        )
+
+        # Get unit costs per MWh
+        typical_latest = (typical_latest - nil_latest.fillna(0)) / typical_consumption
+
+        return cls(
+            name="PPM. Gas",
+            short_name="Gas PPM",
+            fuel="gas",
+            df_nil=nil_latest["DF"],
+            cm_nil=nil_latest["CM"],
+            aa_nil=nil_latest["AA"],
+            pc_nil=nil_latest["PC"],
+            nc_nil=nil_latest["NC"],
+            oc_nil=nil_latest["OC"],
+            smncc_nil=nil_latest["SMNCC"],
+            paac_nil=nil_latest["PAAC"],
+            pap_nil=nil_latest["PAP"],
+            ebit_nil=nil_latest["EBIT"],
+            hap_nil=nil_latest["HAP"],
+            levelisation_nil=nil_latest["Levelisation "],
+            df=typical_latest["DF"],
+            cm=typical_latest["CM"],
+            aa=typical_latest["AA"],
+            pc=typical_latest["PC"],
+            nc=typical_latest["NC"],
+            oc=typical_latest["OC"],
+            smncc=typical_latest["SMNCC"],
+            paac=typical_latest["PAAC"],
+            pap=typical_latest["PAP"],
+            ebit=typical_latest["EBIT"],
+            hap=typical_latest["HAP"],
+            levelisation=typical_latest["Levelisation "],
+        )
