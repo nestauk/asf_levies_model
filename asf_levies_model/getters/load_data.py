@@ -432,7 +432,7 @@ def _get_raw_dataframe_annex9(data_name: str) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-def slice_tariff_components_tables(
+def _slice_tariff_components_tables(
     sheet_start_row: int, levelisation: bool
 ) -> pd.DataFrame:
     """Extracts tariff components tables of interest from Annex 9 tab "1c Consumption adjusted levels".
@@ -468,7 +468,7 @@ def slice_tariff_components_tables(
     return tariff_tables_df
 
 
-def extract_single_tariff_table(
+def _extract_single_tariff_table(
     input_df: pd.DataFrame,
     type_of_consumption: str,
     table_number: int,
@@ -512,15 +512,20 @@ def extract_single_tariff_table(
     # Table without first row
     single_tariff_table_df = single_tariff_table_df.iloc[1:, :]
     # Replace "-" with na
-    single_tariff_table_df = single_tariff_table_df.replace(
-        "[\u002D\u058A\u05BE\u1400\u1806\u2010-\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D]",
-        None,
-        regex=True,
-    )
+    with warnings.catch_warnings():
+        # Suppress Future warning for replace.
+        warnings.simplefilter("ignore")
+        single_tariff_table_df = single_tariff_table_df.replace(
+            "[\u002D\u058A\u05BE\u1400\u1806\u2010-\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D]",
+            None,
+            regex=True,
+        )
     return single_tariff_table_df
 
 
-def tidy_tariff_table(input_df: pd.DataFrame, type_of_consumption: str) -> pd.DataFrame:
+def _tidy_tariff_table(
+    input_df: pd.DataFrame, type_of_consumption: str
+) -> pd.DataFrame:
     """Generates a dataframe for tariff components for one fuel type-payment method in tidy format.
 
     Parameters
@@ -540,12 +545,16 @@ def tidy_tariff_table(input_df: pd.DataFrame, type_of_consumption: str) -> pd.Da
         id_vars=type_of_consumption, var_name="28AD_Charge_Restriction_Period"
     )
     # Add start and end dates
-    tidy_df["28AD_Charge_Restriction_Period_start"] = pd.to_datetime(
-        tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[0]
-    )
-    tidy_df["28AD_Charge_Restriction_Period_end"] = pd.to_datetime(
-        tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[1]
-    )
+    with warnings.catch_warnings():
+        # Suppress warning for datetime parsing each element individually.
+        # Dates in this table are a mess and this is desired behaviour.
+        warnings.simplefilter("ignore")
+        tidy_df["28AD_Charge_Restriction_Period_start"] = pd.to_datetime(
+            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[0]
+        )
+        tidy_df["28AD_Charge_Restriction_Period_end"] = pd.to_datetime(
+            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[1]
+        )
 
     return tidy_df
 
@@ -768,3 +777,173 @@ def ofgem_archetypes_data() -> pd.DataFrame:
         axis=1,
     )
     return dataframe
+
+
+def _process_tariff(
+    sheet_start_row: int,
+    levelisation: bool,
+    type_of_consumption: str,
+    table_number: int,
+) -> pd.DataFrame:
+    """Generic function for returning processed tariff component data from annex 9.
+
+    Parameters
+    ----------
+    sheet_start_row : int
+        Row number of header row in target tables in sheet "1c Consumption adjusted levels".
+    levelisation : bool
+        Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
+    type_of_consumption : str
+        "Nil consumption" or "Typical consumption" ONLY.
+    table_number : int
+       1: Electricity single-rate; 2: Electricity multi-register; 3: Gas; 4: Duel fuel
+    """
+    return _tidy_tariff_table(
+        _extract_single_tariff_table(
+            _slice_tariff_components_tables(sheet_start_row, levelisation),
+            type_of_consumption,
+            table_number,
+        ),
+        type_of_consumption,
+    )
+
+
+## Standard Credit
+# Electricity
+def process_tariff_elec_standard_credit_nil():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 55
+    levelisation = False
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_elec_standard_credit_typical():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 70
+    levelisation = False
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+# Gas
+def process_tariff_gas_standard_credit_nil():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 55
+    levelisation = False
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_gas_standard_credit_typical():
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 70
+    levelisation = False
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+## Other payment method
+# Electricity
+def process_tariff_elec_other_payment_nil():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 19
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_elec_other_payment_typical():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 35
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+# Gas
+def process_tariff_gas_other_payment_nil():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 19
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_gas_other_payment_typical():
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 35
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+## PPM
+# Electricity
+def process_tariff_elec_ppm_nil():
+    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 88
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_elec_ppm_typical():
+    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 104
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+# Gas
+def process_tariff_gas_ppm_nil():
+    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 88
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
+
+
+def process_tariff_gas_ppm_typical():
+    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 104
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number
+    )
