@@ -12,16 +12,37 @@ from requests.sessions import Session
 from requests import RequestException
 from typing import List, Optional, Union
 
-from asf_levies_model import PROJECT_DIR
+from asf_levies_model import config, PROJECT_DIR
+
+# Create data route variable from config
+if config.get("data_downloads").get("annex"):
+    # If a root has been specified, use it.
+    if "PROJECT_DIR" in config.get("data_downloads").get("annex"):
+        # If the root uses the PROJECT_DIR, add that back in
+        DATA_ROOT = (
+            config.get("data_downloads")
+            .get("annex")
+            .replace("PROJECT_DIR", str(PROJECT_DIR))
+        )
+    else:
+        # Otherwise jsut use the given root.
+        DATA_ROOT = config.get("data_downloads").get("annex")
+else:
+    # If no data_output root has been given, just use the base PROJECT_DIR
+    DATA_ROOT = PROJECT_DIR + "/"
+
 
 # Functions for getting and processing Annex 4 data
 
 
-def download_annex_4(url: str, as_fileobject: bool = False) -> Optional[BytesIO]:
+def download_annex_4(
+    url: str = config.get("data_sources").get("ofgem_annex_4"),
+    as_fileobject: bool = False,
+) -> Optional[BytesIO]:
     """Retrieves annex4 xlsx file from Ofgem website and either saves to a file or returns a fileobject.
 
     Args:
-        url: str, url of relevant Ofgem Annex 4 xlsx file.
+        url: str, url of relevant Ofgem Annex 4 xlsx file. Defaults to entry in config.
         as_fileobject: bool (default: False), whether to save to disk or return BytesIO fileobject.
 
     Returns:
@@ -32,8 +53,7 @@ def download_annex_4(url: str, as_fileobject: bool = False) -> Optional[BytesIO]
             response = session.get(url)
             if not as_fileobject:
                 date = datetime.datetime.now().strftime("%Y%m%d")
-                data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-                with open(f"{data_root}{date}_ofgem_annex_4.xlsx", mode="wb") as file:
+                with open(f"{DATA_ROOT}{date}_ofgem_annex_4.xlsx", mode="wb") as file:
                     file.write(response.content)
             else:
                 return BytesIO(response.content)
@@ -87,15 +107,14 @@ def _get_raw_dataframe_annex4(
     """
     if not fileobject:
         date = datetime.datetime.now()
-        data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-        latest_annex_4 = _find_latest_annex(data_root, 4)
+        latest_annex_4 = _find_latest_annex(DATA_ROOT, 4)
         if (
             day_diff := (
                 date - datetime.datetime.strptime(latest_annex_4, "%Y%m%d")
             ).days
         ) > 7:
             warnings.warn(f"Using copy of Annex 4 downloaded {day_diff} days ago.")
-        filepath = f"{data_root}{latest_annex_4}_ofgem_annex_4.xlsx"
+        filepath = f"{DATA_ROOT}{latest_annex_4}_ofgem_annex_4.xlsx"
         try:
             sheet = [
                 sheet_name
@@ -439,11 +458,14 @@ def process_data_FIT(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
 # Functions for getting and processing Annex 9 data
 
 
-def download_annex_9(url: str, as_fileobject: bool = False) -> Optional[BytesIO]:
+def download_annex_9(
+    url: str = config.get("data_sources").get("ofgem_annex_9"),
+    as_fileobject: bool = False,
+) -> Optional[BytesIO]:
     """Retrieves annex9 xlsx file from Ofgem website and either saves to a file or returns a fileobject.
 
     Args:
-        url: str, url of relevant Ofgem Annex 9 xlsx file.
+        url: str, url of relevant Ofgem Annex 9 xlsx file. Defaults to url in config.
         as_fileobject: bool (default: False), whether to save to disk or return BytesIO fileobject.
 
     Returns:
@@ -454,8 +476,7 @@ def download_annex_9(url: str, as_fileobject: bool = False) -> Optional[BytesIO]
             response = session.get(url)
             if not as_fileobject:
                 date = datetime.datetime.now().strftime("%Y%m%d")
-                data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-                with open(f"{data_root}{date}_ofgem_annex_9.xlsx", mode="wb") as file:
+                with open(f"{DATA_ROOT}{date}_ofgem_annex_9.xlsx", mode="wb") as file:
                     file.write(response.content)
             else:
                 return BytesIO(response.content)
@@ -471,15 +492,14 @@ def _get_raw_dataframe_annex9(
     spreadsheet tab corresponding to policy of interest."""
     if not fileobject:
         date = datetime.datetime.now()
-        data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-        latest_annex_9 = _find_latest_annex(data_root, 9)
+        latest_annex_9 = _find_latest_annex(DATA_ROOT, 9)
         if (
             day_diff := (
                 date - datetime.datetime.strptime(latest_annex_9, "%Y%m%d")
             ).days
         ) > 7:
             warnings.warn(f"Using copy of Annex 9 downloaded {day_diff} days ago.")
-        filepath = f"{data_root}{latest_annex_9}_ofgem_annex_9.xlsx"
+        filepath = f"{DATA_ROOT}{latest_annex_9}_ofgem_annex_9.xlsx"
         try:
             sheet = [
                 sheet_name
