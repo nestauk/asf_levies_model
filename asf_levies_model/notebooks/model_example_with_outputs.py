@@ -1,3 +1,20 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     comment_magics: true
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: asf_levies_model
+#     language: python
+#     name: python3
+# ---
+
 # %%
 import pandas as pd
 
@@ -9,11 +26,37 @@ from asf_levies_model.getters.load_data import (
     process_data_WHD,
     process_data_ECO,
     process_data_FIT,
+    download_annex_9,
+    process_tariff_elec_standard_credit_nil,
+    process_tariff_elec_standard_credit_typical,
+    process_tariff_gas_standard_credit_nil,
+    process_tariff_gas_standard_credit_typical,
+    process_tariff_elec_other_payment_nil,
+    process_tariff_elec_other_payment_typical,
+    process_tariff_gas_other_payment_nil,
+    process_tariff_gas_other_payment_typical,
+    process_tariff_elec_ppm_nil,
+    process_tariff_elec_ppm_typical,
+    process_tariff_gas_ppm_nil,
+    process_tariff_gas_ppm_typical,
+    ofgem_archetypes_data,
 )
 
 from asf_levies_model.levies import RO, AAHEDC, GGL, WHD, ECO, FIT
 
-from asf_levies_model.summary import process_rebalancing_scenarios
+from asf_levies_model.summary import (
+    process_rebalancing_scenarios,
+    process_rebalancing_scenario_bills,
+)
+
+from asf_levies_model.tariffs import (
+    ElectricityStandardCredit,
+    GasStandardCredit,
+    ElectricityOtherPayment,
+    GasOtherPayment,
+    ElectricityPPM,
+    GasPPM,
+)
 
 # %%
 # Example downloading annex 4
@@ -224,6 +267,14 @@ weights = {
 }
 
 # %%
+weights = {
+    "100% Gas Variable": {
+        key: gas_variable_weights
+        for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
+    },
+}
+
+# %%
 scenario_outputs = process_rebalancing_scenarios(
     levies,
     weights,
@@ -235,3 +286,61 @@ scenario_outputs = process_rebalancing_scenarios(
     ["variable", "fixed", "total"],
     1_000,
 )
+
+# %% [markdown]
+# Calculating total bills
+
+# %%
+# Getting annex 9
+url = "https://www.ofgem.gov.uk/sites/default/files/2024-08/Annex_9_-_Levelisation_allowance_methodology_and_levelised_cap_levels_v1.3.xlsx"
+download_annex_9(url)
+
+# %%
+elec_other_payment_nil = process_tariff_elec_other_payment_nil()
+elec_other_payment_typical = process_tariff_elec_other_payment_typical()
+gas_other_payment_nil = process_tariff_gas_other_payment_nil()
+gas_other_payment_typical = process_tariff_gas_other_payment_typical()
+
+# %%
+# Initialise bills
+elec_bills = {
+    "baseline": ElectricityOtherPayment.from_dataframe(
+        elec_other_payment_nil, elec_other_payment_typical
+    ),
+    "100% Gas Variable": ElectricityOtherPayment.from_dataframe(
+        elec_other_payment_nil, elec_other_payment_typical
+    ),
+}
+
+gas_bills = {
+    "baseline": GasOtherPayment.from_dataframe(
+        gas_other_payment_nil, gas_other_payment_typical
+    ),
+    "100% Gas Variable": GasOtherPayment.from_dataframe(
+        gas_other_payment_nil, gas_other_payment_typical
+    ),
+}
+
+# Archetypes
+archetype_data = ofgem_archetypes_data()
+
+# %%
+scenario_bill_outputs = process_rebalancing_scenario_bills(
+    elec_bills,
+    gas_bills,
+    levies,
+    weights,
+    denominators,
+    archetype_data,
+    "AnnualConsumptionProfile",
+    "ElectricitySingleRatekWh",
+    "GaskWh",
+    1_000,
+    True,
+)
+scenario_bill_outputs
+
+# %%
+pd.concat([scenario_outputs, scenario_bill_outputs])
+
+# %%
