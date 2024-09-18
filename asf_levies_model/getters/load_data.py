@@ -393,13 +393,15 @@ def process_data_FIT(data_root: str = None) -> pd.DataFrame:
 # Functions for getting and processing Annex 9 data
 
 
-def download_annex_9(url: str) -> None:
+def download_annex_9(url: str, data_root: str = None) -> None:
     """Retrieves file from Ofgem website and saves to file."""
     with Session() as session:
         try:
             response = session.get(url)
             date = datetime.datetime.now().strftime("%Y%m%d")
-            data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+            if not data_root:
+                data_root = f"{PROJECT_DIR}/inputs/data/raw/"
+            print(data_root)
             with open(f"{data_root}{date}_ofgem_annex_9.xlsx", mode="wb") as file:
                 file.write(response.content)
             print("File retrieved successfully.")
