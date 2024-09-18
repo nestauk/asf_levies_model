@@ -259,3 +259,103 @@ It is assumed that the rebalancing weights are the same for each levy.
         )
 
     return pd.concat([baseline] + scenarios, ignore_index=True)
+
+
+def process_rebalancing_scenario_bills(
+    elec_bills: Dict,
+    gas_bills: Dict,
+    levies: list,
+    rebalancing_weights: Dict[str, dict],
+    levy_denominators: Dict[str, dict],
+    consumption_values_df: pd.DataFrame,
+    consumption_profile_column: str,
+    electricity_column: str,
+    gas_column: str,
+    consumption_scale_factor: float = 1,
+    include_baseline: bool = True,
+) -> pd.DataFrame:
+
+    if include_baseline:
+        summary_bill_costs_baseline = consumption_values_df.loc[
+            :,
+            [consumption_profile_column],
+        ]
+
+        summary_bill_costs_baseline["electricity bill incl VAT"] = elec_bills.get(
+            "baseline"
+        ).calculate_total_consumption(
+            consumption_values_df[electricity_column] / consumption_scale_factor,
+            vat=True,
+        )
+
+        summary_bill_costs_baseline["gas bill incl VAT"] = gas_bills.get(
+            "baseline"
+        ).calculate_total_consumption(
+            consumption_values_df[gas_column] / consumption_scale_factor, vat=True
+        )
+
+        summary_bill_costs_baseline["total bill incl VAT"] = (
+            summary_bill_costs_baseline["electricity bill incl VAT"]
+            + summary_bill_costs_baseline["gas bill incl VAT"]
+        )
+
+        summary_bill_costs_baseline["scenario"] = "Baseline"
+
+        summary_bill_costs_scenarios = {}
+        for scenario in rebalancing_weights.keys():
+            new_levies = _rebalance_levies(
+                levies, rebalancing_weights, levy_denominators, scenario
+            )
+
+            elec_bills.get(scenario).pc_nil = sum(
+                [levy.calculate_fixed_levy(True, False) for levy in new_levies]
+            )
+            elec_bills.get(scenario).pc = sum(
+                [levy.calculate_variable_levy(1, 0) for levy in new_levies]
+            )
+            gas_bills.get(scenario).pc_nil = sum(
+                [levy.calculate_fixed_levy(False, True) for levy in new_levies]
+            )
+            gas_bills.get(scenario).pc = sum(
+                [levy.calculate_variable_levy(0, 1) for levy in new_levies]
+            )
+
+            summary_bill_costs_scenario = consumption_values_df.loc[
+                :,
+                [
+                    consumption_profile_column,
+                ],
+            ]
+            summary_bill_costs_scenario["electricity bill incl VAT"] = elec_bills.get(
+                scenario
+            ).calculate_total_consumption(
+                consumption_values_df[electricity_column] / consumption_scale_factor,
+                vat=True,
+            )
+            summary_bill_costs_scenario["gas bill incl VAT"] = gas_bills.get(
+                scenario
+            ).calculate_total_consumption(
+                consumption_values_df[gas_column] / consumption_scale_factor,
+                vat=True,
+            )
+
+            summary_bill_costs_scenario["total bill incl VAT"] = (
+                summary_bill_costs_scenario["electricity bill incl VAT"]
+                + summary_bill_costs_scenario["gas bill incl VAT"]
+            )
+
+            summary_bill_costs_scenario["scenario"] = scenario
+
+            summary_bill_costs_scenarios[scenario] = summary_bill_costs_scenario
+
+    summary_bill_costs = pd.concat([summary_bill_costs_baseline])
+    for name in summary_bill_costs_scenarios.keys():
+        summary_bill_costs = pd.concat(
+            [summary_bill_costs, summary_bill_costs_scenarios[name]]
+        )
+
+    summary_bill_costs = summary_bill_costs.melt(
+        id_vars=[consumption_profile_column, "scenario"]
+    )
+
+    return summary_bill_costs
