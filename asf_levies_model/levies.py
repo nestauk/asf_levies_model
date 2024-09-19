@@ -130,7 +130,9 @@ class Levy:
             + self.gas_variable_rate * gas_consumption
         )
 
-    def calculate_fixed_levy(self, electricity_customer: bool, gas_customer: bool) -> float:
+    def calculate_fixed_levy(
+        self, electricity_customer: bool, gas_customer: bool
+    ) -> float:
         """Calculate fixed component of levy for given customers.
 
         Args:
@@ -209,7 +211,9 @@ class Levy:
             revenue_tax,
             self.revenue,
         ):
-            raise ValueError("Rebalancing failed to maintain revenue. (Try: Check that new electricity-gas-tax and fixed-variable weights provided add up to 1, respectively.)")
+            raise ValueError(
+                "Rebalancing failed to maintain revenue. (Try: Check that new electricity-gas-tax and fixed-variable weights provided add up to 1, respectively.)"
+            )
 
         if inplace:
             # Update attributes
@@ -421,7 +425,7 @@ BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fi
             revenue = ro_levy * denominator
 
         return cls(
-            name="renewables obligation",
+            name="Renewables Obligation",
             short_name="ro",
             electricity_weight=1,
             gas_weight=0,

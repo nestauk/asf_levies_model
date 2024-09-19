@@ -165,42 +165,61 @@ consumption_values_df = pd.concat(
 )
 
 # %%
+electricity_variable_weights = {
+    "new_electricity_weight": 1,
+    "new_gas_weight": 0,
+    "new_tax_weight": 0,
+    "new_variable_weight_elec": 1,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 0,
+}
+
+electricity_fixed_weights = {
+    "new_electricity_weight": 1,
+    "new_gas_weight": 0,
+    "new_tax_weight": 0,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 1,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 0,
+}
+
+gas_variable_weights = {
+    "new_electricity_weight": 0,
+    "new_gas_weight": 1,
+    "new_tax_weight": 0,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 1,
+    "new_fixed_weight_gas": 0,
+}
+
+gas_fixed_weights = {
+    "new_electricity_weight": 0,
+    "new_gas_weight": 1,
+    "new_tax_weight": 0,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 1,
+}
+
 weights = {
     "100% Electricity Variable": {
-        "new_electricity_weight": 1,
-        "new_gas_weight": 0,
-        "new_tax_weight": 0,
-        "new_variable_weight_elec": 1,
-        "new_fixed_weight_elec": 0,
-        "new_variable_weight_gas": 0,
-        "new_fixed_weight_gas": 0,
+        key: electricity_variable_weights
+        for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
     },
     "100% Electricity Fixed": {
-        "new_electricity_weight": 1,
-        "new_gas_weight": 0,
-        "new_tax_weight": 0,
-        "new_variable_weight_elec": 0,
-        "new_fixed_weight_elec": 1,
-        "new_variable_weight_gas": 0,
-        "new_fixed_weight_gas": 0,
-    },
-    "100% Gas Fixed": {
-        "new_electricity_weight": 0,
-        "new_gas_weight": 1,
-        "new_tax_weight": 0,
-        "new_variable_weight_elec": 0,
-        "new_fixed_weight_elec": 0,
-        "new_variable_weight_gas": 0,
-        "new_fixed_weight_gas": 1,
+        key: electricity_fixed_weights
+        for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
     },
     "100% Gas Variable": {
-        "new_electricity_weight": 0,
-        "new_gas_weight": 1,
-        "new_tax_weight": 0,
-        "new_variable_weight_elec": 0,
-        "new_fixed_weight_elec": 0,
-        "new_variable_weight_gas": 1,
-        "new_fixed_weight_gas": 0,
+        key: gas_variable_weights
+        for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
+    },
+    "100% Gas Fixed": {
+        key: gas_fixed_weights for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
     },
 }
 
