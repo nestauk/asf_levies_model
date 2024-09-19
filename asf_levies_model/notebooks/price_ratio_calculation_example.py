@@ -89,6 +89,37 @@ elec_bill.calculate_variable_consumption(1) / gas_bill.calculate_variable_consum
 
 # %% [markdown]
 # ---
+
+# %% [markdown]
+# Checking domestic denominator values with number of households reported with Ofgem archetypes
+
+# %%
+# Subnational accounts, domestic
+supply_elec = 94_200_366
+supply_gas = 265_197_947
+customers_gas = 24_503_683
+customers_elec = 29_078_770
+
+# %%
+archetype_data = ofgem_archetypes_data()
+
+# %% [markdown]
+# Number of gas households
+
+# %%
+gas_households = archetype_data.loc[
+    archetype_data["GaskWh"] != 0, "ArchetypeSize"
+].sum()
+gas_households, customers_gas
+
+# %%
+elec_households = archetype_data.loc[
+    archetype_data["ElectricitySingleRatekWh"] != 0, "ArchetypeSize"
+].sum()
+elec_households, customers_elec
+
+# %% [markdown]
+# ---
 # *Ignore below (not correct way of calculating electricity:gas price ratio)*
 
 # %% [markdown]
