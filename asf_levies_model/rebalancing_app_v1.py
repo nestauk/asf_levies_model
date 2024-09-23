@@ -47,40 +47,44 @@ st.subheader(
     "**Downloading latest Ofgem policy cost and price cap data 🗃️**", divider=True
 )
 
-with tempfile.TemporaryDirectory() as tmpdir:
-    url = "https://www.ofgem.gov.uk/sites/default/files/2024-08/Annex_4_-_Policy_cost_allowance_methodology_v1.19 (1).xlsx"
-    with st.spinner("Downloading latest Ofgem policy cost data..."):
-        download_annex_4(url, tmpdir)
-    st.success("Latest policy cost data downloaded!")
-
-    # Load energy consumption profiles
-    ofgem_archetypes_df = ofgem_archetypes_data()
-
-    # Initialise existing levies
+with st.spinner("Downloading latest Ofgem policy cost data..."):
+    fileobject = download_annex_4(as_fileobject=True)
     levies = [
-        RO.from_dataframe(
-            process_data_RO(tmpdir), denominator=94_200_366
-        ),  # domestic denominator
-        AAHEDC.from_dataframe(
-            process_data_AAHEDC(tmpdir), denominator=94_200_366
-        ),  # domestic denominator
-        GGL.from_dataframe(
-            process_data_GGL(tmpdir), denominator=24_503_683
-        ),  # domestic denominator
-        WHD.from_dataframe(process_data_WHD(tmpdir)),  # domestic only levy
-        ECO.from_dataframe(process_data_ECO(tmpdir)),  # domestic only levy
-        FIT.from_dataframe(
-            process_data_FIT(tmpdir),
-            revenue=689_233_317,  # This revenue is the domestic share based on domestic electricity supply/total elligible supply.
-        ),
+        RO.from_dataframe(process_data_RO(fileobject), denominator=94_200_366),
+        AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=94_200_366),
+        GGL.from_dataframe(process_data_GGL(fileobject), denominator=24_503_683),
+        WHD.from_dataframe(process_data_WHD(fileobject)),
+        ECO.from_dataframe(process_data_ECO(fileobject)),
+        FIT.from_dataframe(process_data_FIT(fileobject), revenue=689_233_317),
     ]
+    fileobject.close()
+st.success("Latest policy cost data downloaded!")
 
 # Download Annex 9 data
-with tempfile.TemporaryDirectory() as tmpdir:
-    url = "https://www.ofgem.gov.uk/sites/default/files/2024-08/Annex_9_-_Levelisation_allowance_methodology_and_levelised_cap_levels_v1.3.xlsx"
-    with st.spinner("Downloading latest Ofgem policy cost data..."):
-        download_annex_9(url, tmpdir)
-    st.success("Latest final levelised price cap data downloaded!")
+with st.spinner("Downloading latest Ofgem price cap data..."):
+    fileobject = download_annex_9(as_fileobject=True)
+    # Other payment
+    elec_other_payment_nil = process_tariff_elec_other_payment_nil(fileobject)
+    elec_other_payment_typical = process_tariff_elec_other_payment_typical(fileobject)
+    gas_other_payment_nil = process_tariff_gas_other_payment_nil(fileobject)
+    gas_other_payment_typical = process_tariff_gas_other_payment_typical(fileobject)
+    # Prepayment meter
+    elec_ppm_nil = process_tariff_elec_ppm_nil(fileobject)
+    elec_ppm_typical = process_tariff_elec_ppm_typical(fileobject)
+    gas_ppm_nil = process_tariff_gas_ppm_nil(fileobject)
+    gas_ppm_typical = process_tariff_gas_ppm_typical(fileobject)
+    # Standard Credit
+    elec_standard_credit_nil = process_tariff_elec_standard_credit_nil(fileobject)
+    elec_standard_credit_typical = process_tariff_elec_standard_credit_typical(
+        fileobject
+    )
+    gas_standard_credit_nil = process_tariff_gas_standard_credit_nil(fileobject)
+    gas_standard_credit_typical = process_tariff_gas_standard_credit_typical(fileobject)
+    fileobject.close()
+st.success("Latest final levelised price cap data downloaded!")
+
+# Load energy consumption profiles
+ofgem_archetypes_df = ofgem_archetypes_data()
 
 # Take rebalancing scenario name
 st.subheader("**What would you like to call your rebalancing scenario?**", divider=True)
@@ -245,12 +249,6 @@ tariff_payment_method = st.selectbox(
 )
 
 if tariff_payment_method == "Other payment method":
-    elec_other_payment_nil = process_tariff_elec_other_payment_nil()
-    elec_other_payment_typical = process_tariff_elec_other_payment_typical()
-
-    gas_other_payment_nil = process_tariff_gas_other_payment_nil()
-    gas_other_payment_typical = process_tariff_gas_other_payment_typical()
-
     elec_bills = {
         "baseline": ElectricityOtherPayment.from_dataframe(
             elec_other_payment_nil, elec_other_payment_typical
@@ -269,13 +267,6 @@ if tariff_payment_method == "Other payment method":
     }
 
 if tariff_payment_method == "Prepayment meter":
-
-    elec_ppm_nil = process_tariff_elec_ppm_nil()
-    elec_ppm_typical = process_tariff_elec_ppm_typical()
-
-    gas_ppm_nil = process_tariff_gas_ppm_nil()
-    gas_ppm_typical = process_tariff_gas_ppm_typical()
-
     elec_bills = {
         "baseline": ElectricityPPM.from_dataframe(elec_ppm_nil, elec_ppm_typical),
         scenario_name: ElectricityPPM.from_dataframe(elec_ppm_nil, elec_ppm_typical),
@@ -286,13 +277,6 @@ if tariff_payment_method == "Prepayment meter":
     }
 
 if tariff_payment_method == "Standard Credit":
-
-    elec_standard_credit_nil = process_tariff_elec_standard_credit_nil()
-    elec_standard_credit_typical = process_tariff_elec_standard_credit_typical()
-
-    gas_standard_credit_nil = process_tariff_gas_standard_credit_nil()
-    gas_standard_credit_typical = process_tariff_gas_standard_credit_typical()
-
     elec_bills = {
         "baseline": ElectricityStandardCredit.from_dataframe(
             elec_standard_credit_nil, elec_standard_credit_typical
