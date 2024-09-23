@@ -29,7 +29,7 @@ if config.get("data_downloads").get("annex"):
         DATA_ROOT = config.get("data_downloads").get("annex")
 else:
     # If no data_output root has been given, just use the base PROJECT_DIR
-    DATA_ROOT = PROJECT_DIR + "/"
+    DATA_ROOT = str(PROJECT_DIR) + "/"
 
 
 # Functions for getting and processing Annex 4 data
