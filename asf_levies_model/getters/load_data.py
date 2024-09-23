@@ -7,30 +7,57 @@ import re
 import warnings
 import zipfile
 
+from io import BytesIO
 from os import listdir
 from requests.sessions import Session
 from requests import RequestException
-from typing import List
+from typing import List, Optional, Union
 
-# from asf_levies_model import PROJECT_DIR
-from pathlib import Path
+from asf_levies_model import config, PROJECT_DIR
 
-PROJECT_DIR = Path(__file__).resolve().parents[2]
+# Create data route variable from config
+if config.get("data_downloads").get("annex"):
+    # If a root has been specified, use it.
+    if "PROJECT_DIR" in config.get("data_downloads").get("annex"):
+        # If the root uses the PROJECT_DIR, add that back in
+        DATA_ROOT = (
+            config.get("data_downloads")
+            .get("annex")
+            .replace("PROJECT_DIR", str(PROJECT_DIR))
+        )
+    else:
+        # Otherwise jsut use the given root.
+        DATA_ROOT = config.get("data_downloads").get("annex")
+else:
+    # If no data_output root has been given, just use the base PROJECT_DIR
+    DATA_ROOT = str(PROJECT_DIR) + "/"
+
 
 # Functions for getting and processing Annex 4 data
 
 
-def download_annex_4(url: str, data_root: str = None) -> None:
-    """Retrieves file from Ofgem website and saves to file."""
+def download_annex_4(
+    url: str = config.get("data_sources").get("ofgem_annex_4"),
+    as_fileobject: bool = False,
+) -> Optional[BytesIO]:
+    """Retrieves annex4 xlsx file from Ofgem website and either saves to a file or returns a fileobject.
+
+    Args:
+        url: str, url of relevant Ofgem Annex 4 xlsx file. Defaults to entry in config.
+        as_fileobject: bool (default: False), whether to save to disk or return BytesIO fileobject.
+
+    Returns:
+        Optionally, None or BytesIO fileobject.
+    """
     with Session() as session:
         try:
             response = session.get(url)
-            date = datetime.datetime.now().strftime("%Y%m%d")
-            if not data_root:
-                data_root = f"{PROJECT_DIR}/inputs/data/raw"
-            print(data_root)
-            with open(f"{data_root}/{date}_ofgem_annex_4.xlsx", mode="wb") as file:
-                file.write(response.content)
+            if not as_fileobject:
+                date = datetime.datetime.now().strftime("%Y%m%d")
+                with open(f"{DATA_ROOT}{date}_ofgem_annex_4.xlsx", mode="wb") as file:
+                    file.write(response.content)
+            else:
+                return BytesIO(response.content)
             print("File retrieved successfully.")
         except RequestException as rex:
             print("Failed to download annex 4", rex)
@@ -49,8 +76,15 @@ def _find_latest_annex(data_root: str, annex_to_find: int) -> str:
         raise FileNotFoundError(f"No local copies of Annex {annex_to_find} available.")
 
 
-def _get_excel_sheet_names(file_path: str) -> list:
-    """Gets xlsx sheet names quickly."""
+def _get_excel_sheet_names(file_path: Union[str, BytesIO]) -> list:
+    """Gets xlsx sheet names quickly for file or fileobject.
+
+    Args:
+        file_path: str or BytesIO, filepath or fileobject for excel xlsx file.
+
+    Returns:
+        List of sheet names.
+    """
     with zipfile.ZipFile(file_path, "r") as zip_ref:
         xml = zip_ref.read("xl/workbook.xml").decode("utf-8")
     sheets = []
@@ -59,30 +93,63 @@ def _get_excel_sheet_names(file_path: str) -> list:
     return sheets
 
 
-def _get_raw_dataframe_annex4(policy_name: str, data_root: str = None) -> pd.DataFrame:
+def _get_raw_dataframe_annex4(
+    policy_name: str, fileobject: Optional[BytesIO] = None
+) -> pd.DataFrame:
     """Creates a pandas dataframe of raw data from Ofgem Annex 4
-    spreadsheet tab corresponding to policy of interest."""
-    date = datetime.datetime.now()
-    if not data_root:
-        data_root = f"{PROJECT_DIR}/inputs/data/raw"
-    latest_annex_4 = _find_latest_annex(data_root + "/", 4)
-    if (
-        day_diff := (date - datetime.datetime.strptime(latest_annex_4, "%Y%m%d")).days
-    ) > 7:
-        warnings.warn(f"Using copy of Annex 4 downloaded {day_diff} days ago.")
-    filepath = f"{data_root}/{latest_annex_4}_ofgem_annex_4.xlsx"
-    try:
-        sheet = [
-            sheet_name
-            for sheet_name in _get_excel_sheet_names(filepath)
-            if policy_name in sheet_name
-        ][0]
-    except:
-        raise ValueError("Acronym given does not correspond to a valid policy.")
+    spreadsheet tab corresponding to policy of interest.
 
-    return pd.read_excel(
-        filepath, sheet_name=sheet, skiprows=4, header=1, index_col=0, engine="calamine"
-    ).reset_index(drop=True)
+    Args:
+        policy_name: str, identifier for policy of interest. Must be reference as tab in Annex 4.
+        fileobject: None or BytesIO, fileobject if working in memory else None.
+
+    Returns:
+        pandas DataFrame of Annex 4 data for specified policy_name.
+    """
+    if not fileobject:
+        date = datetime.datetime.now()
+        latest_annex_4 = _find_latest_annex(DATA_ROOT, 4)
+        if (
+            day_diff := (
+                date - datetime.datetime.strptime(latest_annex_4, "%Y%m%d")
+            ).days
+        ) > 7:
+            warnings.warn(f"Using copy of Annex 4 downloaded {day_diff} days ago.")
+        filepath = f"{DATA_ROOT}{latest_annex_4}_ofgem_annex_4.xlsx"
+        try:
+            sheet = [
+                sheet_name
+                for sheet_name in _get_excel_sheet_names(filepath)
+                if policy_name in sheet_name
+            ][0]
+        except:
+            raise ValueError("Acronym given does not correspond to a valid policy.")
+
+        return pd.read_excel(
+            filepath,
+            sheet_name=sheet,
+            skiprows=4,
+            header=1,
+            index_col=0,
+            engine="calamine",
+        ).reset_index(drop=True)
+    else:
+        try:
+            sheet = [
+                sheet_name
+                for sheet_name in _get_excel_sheet_names(fileobject)
+                if policy_name in sheet_name
+            ][0]
+        except:
+            raise ValueError("Acronym given does not correspond to a valid policy.")
+        return pd.read_excel(
+            fileobject,
+            sheet_name=sheet,
+            skiprows=4,
+            header=1,
+            index_col=0,
+            engine="calamine",
+        ).reset_index(drop=True)
 
 
 def _get_update_dates(policy_df: pd.DataFrame) -> list:
@@ -150,11 +217,11 @@ def _process_data(
     policy_acronym: str,
     policy_parameters: list,
     column_names: list,
-    data_root: str = None,
+    fileobject: Optional[BytesIO] = None,
 ) -> pd.DataFrame:
     """Generic function for returning processed annex 4 data."""
     # Create dataframe of raw RO data from spreadsheet tab
-    df = _get_raw_dataframe_annex4(policy_acronym, data_root)
+    df = _get_raw_dataframe_annex4(policy_acronym, fileobject)
     # Create list of update dates
     update_dates = _get_update_dates(df)
     # Create list of charging years
@@ -180,7 +247,7 @@ def _process_data(
     return data_tidy_df
 
 
-def process_data_RO(data_root: str = None) -> pd.DataFrame:
+def process_data_RO(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding RO tab in annex 4 into tidy format."""
     parameters = [
         "Obligation level for scheme year",
@@ -194,10 +261,10 @@ def process_data_RO(data_root: str = None) -> pd.DataFrame:
         "BuyOutPricePreviousYear",
         "ForecastAnnualRPIPreviousYear",
     ]
-    return _process_data("RO", parameters, names, data_root)
+    return _process_data("RO", parameters, names, fileobject)
 
 
-def process_data_WHD(data_root: str = None) -> pd.DataFrame:
+def process_data_WHD(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding WHD tab in annex 4 into tidy format."""
     parameters = [
         "Target spending for scheme year",
@@ -213,10 +280,10 @@ def process_data_WHD(data_root: str = None) -> pd.DataFrame:
         "ObligatedSuppliersCustomerBase",
         "CompulsorySupplierFractionOfCoreGroup",
     ]
-    return _process_data("WHD", parameters, names, data_root)
+    return _process_data("WHD", parameters, names, fileobject)
 
 
-def process_data_AAHEDC(data_root: str = None) -> pd.DataFrame:
+def process_data_AAHEDC(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding AAHEDC tab in annex 4 into tidy format."""
     parameters = [
         "Final AAHEDC tariff for current charging year",
@@ -224,17 +291,17 @@ def process_data_AAHEDC(data_root: str = None) -> pd.DataFrame:
         "Forecast of annual RPI for previous charging year",
     ]
     names = ["TariffCurrentYear", "TariffPreviousYear", "ForecastAnnualRPIPreviousYear"]
-    return _process_data("AAHEDC", parameters, names, data_root)
+    return _process_data("AAHEDC", parameters, names, fileobject)
 
 
-def process_data_GGL(data_root: str = None) -> pd.DataFrame:
+def process_data_GGL(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding GGL tab in annex 4 into tidy format."""
     parameters = ["Levy rate", "Backdated levy rate for first scheme year"]
     names = ["LevyRate", "BackdatedLevyRate"]
-    return _process_data("GGL", parameters, names, data_root)
+    return _process_data("GGL", parameters, names, fileobject)
 
 
-def process_data_ECO(data_root: str = None) -> pd.DataFrame:
+def process_data_ECO(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding ECO tab in annex 4 into tidy format."""
     parameters = [
         "Annualised costs for scheme year attributed to gas - ECO4",
@@ -260,7 +327,7 @@ def process_data_ECO(data_root: str = None) -> pd.DataFrame:
         "ObligatedSupplierVolumeElectricity",
     ]
 
-    eco_df = _process_data("ECO", parameters, names, data_root)
+    eco_df = _process_data("ECO", parameters, names, fileobject)
 
     # Manually fix apparent typo if present in data.
     if (eco_df["UpdateDate"] == "2022-02-01").sum() == 2:
@@ -338,10 +405,10 @@ def _extract_FIT_policy_data(
     return policy_df.loc[parameter_row_index, parameter_col_index].to_numpy()
 
 
-def process_data_FIT(data_root: str = None) -> pd.DataFrame:
+def process_data_FIT(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding New FIT tab in annex 4 into tidy format."""
     # Create dataframe of raw FIT data from spreadsheet tab
-    FIT_df = _get_raw_dataframe_annex4("New FIT", data_root)
+    FIT_df = _get_raw_dataframe_annex4("New FIT", fileobject)
     # Create list of 28AD charge restriction periods (Table 5)
     charge_periods = _get_charging_periods(FIT_df)
     charge_periods_1 = charge_periods[0]
@@ -393,49 +460,83 @@ def process_data_FIT(data_root: str = None) -> pd.DataFrame:
 # Functions for getting and processing Annex 9 data
 
 
-def download_annex_9(url: str, data_root: str = None) -> None:
-    """Retrieves file from Ofgem website and saves to file."""
+def download_annex_9(
+    url: str = config.get("data_sources").get("ofgem_annex_9"),
+    as_fileobject: bool = False,
+) -> Optional[BytesIO]:
+    """Retrieves annex9 xlsx file from Ofgem website and either saves to a file or returns a fileobject.
+
+    Args:
+        url: str, url of relevant Ofgem Annex 9 xlsx file. Defaults to url in config.
+        as_fileobject: bool (default: False), whether to save to disk or return BytesIO fileobject.
+
+    Returns:
+        Optionally, None or BytesIO fileobject.
+    """
     with Session() as session:
         try:
             response = session.get(url)
-            date = datetime.datetime.now().strftime("%Y%m%d")
-            if not data_root:
-                data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-            print(data_root)
-            with open(f"{data_root}{date}_ofgem_annex_9.xlsx", mode="wb") as file:
-                file.write(response.content)
+            if not as_fileobject:
+                date = datetime.datetime.now().strftime("%Y%m%d")
+                with open(f"{DATA_ROOT}{date}_ofgem_annex_9.xlsx", mode="wb") as file:
+                    file.write(response.content)
+            else:
+                return BytesIO(response.content)
             print("File retrieved successfully.")
         except RequestException as rex:
             print("Failed to download annex 9", rex)
 
 
-def _get_raw_dataframe_annex9(data_name: str) -> pd.DataFrame:
+def _get_raw_dataframe_annex9(
+    data_name: str, fileobject: Optional[BytesIO] = None
+) -> pd.DataFrame:
     """Creates a pandas dataframe of raw data from Ofgem Annex 9
     spreadsheet tab corresponding to policy of interest."""
-    date = datetime.datetime.now()
-    data_root = f"{PROJECT_DIR}/inputs/data/raw/"
-    latest_annex_9 = _find_latest_annex(data_root, 9)
-    if (
-        day_diff := (date - datetime.datetime.strptime(latest_annex_9, "%Y%m%d")).days
-    ) > 7:
-        warnings.warn(f"Using copy of Annex 9 downloaded {day_diff} days ago.")
-    filepath = f"{data_root}{latest_annex_9}_ofgem_annex_9.xlsx"
-    try:
-        sheet = [
-            sheet_name
-            for sheet_name in _get_excel_sheet_names(filepath)
-            if data_name in sheet_name
-        ][0]
-    except:
-        raise ValueError("Input does not correspond to a valid tab in the spreadsheet.")
+    if not fileobject:
+        date = datetime.datetime.now()
+        latest_annex_9 = _find_latest_annex(DATA_ROOT, 9)
+        if (
+            day_diff := (
+                date - datetime.datetime.strptime(latest_annex_9, "%Y%m%d")
+            ).days
+        ) > 7:
+            warnings.warn(f"Using copy of Annex 9 downloaded {day_diff} days ago.")
+        filepath = f"{DATA_ROOT}{latest_annex_9}_ofgem_annex_9.xlsx"
+        try:
+            sheet = [
+                sheet_name
+                for sheet_name in _get_excel_sheet_names(filepath)
+                if data_name in sheet_name
+            ][0]
+        except:
+            raise ValueError(
+                "Input does not correspond to a valid tab in the spreadsheet."
+            )
 
-    return pd.read_excel(
-        filepath, sheet_name=sheet, header=1, index_col=0, engine="calamine"
-    ).reset_index(drop=True)
+        return pd.read_excel(
+            filepath, sheet_name=sheet, header=1, index_col=0, engine="calamine"
+        ).reset_index(drop=True)
+    else:
+        try:
+            sheet = [
+                sheet_name
+                for sheet_name in _get_excel_sheet_names(fileobject)
+                if data_name in sheet_name
+            ][0]
+        except:
+            raise ValueError(
+                "Input does not correspond to a valid tab in the spreadsheet."
+            )
+
+        return pd.read_excel(
+            fileobject, sheet_name=sheet, header=1, index_col=0, engine="calamine"
+        ).reset_index(drop=True)
 
 
 def _slice_tariff_components_tables(
-    sheet_start_row: int, levelisation: bool
+    sheet_start_row: int,
+    levelisation: bool,
+    fileobject: Optional[BytesIO] = None,
 ) -> pd.DataFrame:
     """Extracts tariff components tables of interest from Annex 9 tab "1c Consumption adjusted levels".
 
@@ -443,9 +544,10 @@ def _slice_tariff_components_tables(
     ----------
     sheet_start_row : int
         Row number of header row in target tables in sheet "1c Consumption adjusted levels".
-
     levelisation : bool
         Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
+    fileobject : BytesIO or None
+        BytesIO fileobject if working in memory else None.
 
     Returns
     -------
@@ -455,7 +557,7 @@ def _slice_tariff_components_tables(
 
     # Create dataframe of raw consumption adjusted level costs from spreadsheet tab
     consumption_adjusted_levels_df = _get_raw_dataframe_annex9(
-        "Consumption adjusted levels"
+        "Consumption adjusted levels", fileobject
     )
 
     if levelisation is True:
@@ -559,6 +661,201 @@ def _tidy_tariff_table(
         )
 
     return tidy_df
+
+
+def _process_tariff(
+    sheet_start_row: int,
+    levelisation: bool,
+    type_of_consumption: str,
+    table_number: int,
+    fileobject: Optional[BytesIO] = None,
+) -> pd.DataFrame:
+    """Generic function for returning processed tariff component data from annex 9.
+
+    Parameters
+    ----------
+    sheet_start_row : int
+        Row number of header row in target tables in sheet "1c Consumption adjusted levels".
+    levelisation : bool
+        Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
+    type_of_consumption : str
+        "Nil consumption" or "Typical consumption" ONLY.
+    table_number : int
+        1: Electricity single-rate; 2: Electricity multi-register; 3: Gas; 4: Duel fuel
+    fileobject : BytesIO or None
+        BytesIO fileobject if working in memory else None.
+    """
+    return _tidy_tariff_table(
+        _extract_single_tariff_table(
+            _slice_tariff_components_tables(sheet_start_row, levelisation, fileobject),
+            type_of_consumption,
+            table_number,
+        ),
+        type_of_consumption,
+    )
+
+
+## Standard Credit
+# Electricity
+def process_tariff_elec_standard_credit_nil(fileobject: Optional[BytesIO] = None):
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 55
+    levelisation = False
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+def process_tariff_elec_standard_credit_typical(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 70
+    levelisation = False
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+# Gas
+def process_tariff_gas_standard_credit_nil(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 55
+    levelisation = False
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+def process_tariff_gas_standard_credit_typical(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 70
+    levelisation = False
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+## Other payment method
+# Electricity
+def process_tariff_elec_other_payment_nil(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 19
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+def process_tariff_elec_other_payment_typical(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 35
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+# Gas
+def process_tariff_gas_other_payment_nil(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 19
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+def process_tariff_gas_other_payment_typical(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 35
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+## PPM
+# Electricity
+def process_tariff_elec_ppm_nil(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
+    sheet_start_row = 88
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+def process_tariff_elec_ppm_typical(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
+    sheet_start_row = 104
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 1
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+# Gas
+def process_tariff_gas_ppm_nil(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Nil consumption."""
+    sheet_start_row = 88
+    levelisation = True
+    type_of_consumption = "Nil consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
+
+
+def process_tariff_gas_ppm_typical(
+    fileobject: Optional[BytesIO] = None,
+):
+    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Typical consumption."""
+    sheet_start_row = 104
+    levelisation = True
+    type_of_consumption = "Typical consumption"
+    table_number = 3
+    return _process_tariff(
+        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
+    )
 
 
 def ofgem_archetypes_data() -> pd.DataFrame:
@@ -779,173 +1076,3 @@ def ofgem_archetypes_data() -> pd.DataFrame:
         axis=1,
     )
     return dataframe
-
-
-def _process_tariff(
-    sheet_start_row: int,
-    levelisation: bool,
-    type_of_consumption: str,
-    table_number: int,
-) -> pd.DataFrame:
-    """Generic function for returning processed tariff component data from annex 9.
-
-    Parameters
-    ----------
-    sheet_start_row : int
-        Row number of header row in target tables in sheet "1c Consumption adjusted levels".
-    levelisation : bool
-        Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
-    type_of_consumption : str
-        "Nil consumption" or "Typical consumption" ONLY.
-    table_number : int
-       1: Electricity single-rate; 2: Electricity multi-register; 3: Gas; 4: Duel fuel
-    """
-    return _tidy_tariff_table(
-        _extract_single_tariff_table(
-            _slice_tariff_components_tables(sheet_start_row, levelisation),
-            type_of_consumption,
-            table_number,
-        ),
-        type_of_consumption,
-    )
-
-
-## Standard Credit
-# Electricity
-def process_tariff_elec_standard_credit_nil():
-    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
-    sheet_start_row = 55
-    levelisation = False
-    type_of_consumption = "Nil consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-def process_tariff_elec_standard_credit_typical():
-    """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
-    sheet_start_row = 70
-    levelisation = False
-    type_of_consumption = "Typical consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-# Gas
-def process_tariff_gas_standard_credit_nil():
-    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Nil consumption."""
-    sheet_start_row = 55
-    levelisation = False
-    type_of_consumption = "Nil consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-def process_tariff_gas_standard_credit_typical():
-    """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Typical consumption."""
-    sheet_start_row = 70
-    levelisation = False
-    type_of_consumption = "Typical consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-## Other payment method
-# Electricity
-def process_tariff_elec_other_payment_nil():
-    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
-    sheet_start_row = 19
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-def process_tariff_elec_other_payment_typical():
-    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
-    sheet_start_row = 35
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-# Gas
-def process_tariff_gas_other_payment_nil():
-    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Nil consumption."""
-    sheet_start_row = 19
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-def process_tariff_gas_other_payment_typical():
-    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Typical consumption."""
-    sheet_start_row = 35
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-## PPM
-# Electricity
-def process_tariff_elec_ppm_nil():
-    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
-    sheet_start_row = 88
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-def process_tariff_elec_ppm_typical():
-    """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
-    sheet_start_row = 104
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-# Gas
-def process_tariff_gas_ppm_nil():
-    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Nil consumption."""
-    sheet_start_row = 88
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
-
-
-def process_tariff_gas_ppm_typical():
-    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Typical consumption."""
-    sheet_start_row = 104
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number
-    )
