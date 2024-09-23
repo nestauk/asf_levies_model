@@ -24,4 +24,6 @@ setup(
     description="Analytical model of domestic energy bills and levies.",
     author="Nesta",
     license="MIT",
+    package_data={"": ["base.yaml"]},
+    include_package_data=True,
 )
