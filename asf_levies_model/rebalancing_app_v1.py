@@ -31,22 +31,16 @@ from levies import RO, AAHEDC, GGL, WHD, ECO, FIT
 
 from summary import process_rebalancing_scenarios, process_rebalancing_scenario_bills
 
-from tariffs import (
-    ElectricityOtherPayment,
-    GasOtherPayment,
-    ElectricityPPM,
-    GasPPM,
-    ElectricityStandardCredit,
-    GasStandardCredit,
-)
+from utils.st_components import get_preset_weights, get_bills
 
 st.title("Policy cost levies rebalancing model V1")
 
-# Download Annex 4 data
+### DOWNLOADING DATA ###
 st.subheader(
     "**Downloading latest Ofgem policy cost and price cap data 🗃️**", divider=True
 )
 
+# Download Annex 4 data and initialise levy objects
 with st.spinner("Downloading latest Ofgem policy cost data..."):
     fileobject = download_annex_4(as_fileobject=True)
     levies = [
@@ -83,15 +77,32 @@ with st.spinner("Downloading latest Ofgem price cap data..."):
     fileobject.close()
 st.success("Latest final levelised price cap data downloaded!")
 
+# Create dictionaries of tariff data
+elec_tariff_data = {
+    "other_payment": (elec_other_payment_nil, elec_other_payment_typical),
+    "ppm": (elec_ppm_nil, elec_ppm_typical),
+    "standard_credit": (elec_standard_credit_nil, elec_standard_credit_typical),
+}
+
+gas_tariff_data = {
+    "other_payment": (gas_other_payment_nil, gas_other_payment_typical),
+    "ppm": (gas_ppm_nil, gas_ppm_typical),
+    "standard_credit": (gas_standard_credit_nil, gas_standard_credit_typical),
+}
+
 # Load energy consumption profiles
 ofgem_archetypes_df = ofgem_archetypes_data()
 
+
+### USER INPUT: SCENARIO NAME ###
 # Take rebalancing scenario name
 st.subheader("**What would you like to call your rebalancing scenario?**", divider=True)
 scenario_name = st.text_input("Enter scenario name")
 if not scenario_name:
     st.error("Please provide a scenario name.")
 
+
+### USER INPUT: DENOMINATORS ###
 # Take user input for choice of denominator data for rebalancing
 st.subheader("**Set charging base**", divider=True)
 denominator_data_status = st.radio(
@@ -119,27 +130,50 @@ denominators = {
     key: denominator_values for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
 }
 
-
-# Take rebalancing weights for electricity/gas/tax
+### USER INPUT: REBALANCING WEIGHTS ###
 st.subheader(
     "**What percentage of each levy revenue should be reapportioned to :blue[electricity], :red[gas] and :violet[general taxation]?**",
     divider=True,
 )
 
+# Take user input for preset preference
+st.write("**Would you like to use your own or preset rebalancing values?**")
+preset = st.selectbox(
+    "Use rebalancing weights:",
+    (
+        "My own",
+        "All gas, status quo fixed or variable",
+        "All electricity, status quo fixed or variable",
+        "Status quo gas and electricity, all fixed",
+        "Status quo gas and electricity, all variable",
+    ),
+)
+
+levy_elec_shares, levy_gas_shares, levy_fixed_shares = get_preset_weights(
+    preset, customers_elec, customers_gas
+)
+
+# Take rebalancing weights for electricity/gas/tax
 col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown("**:blue[Electricity]**")
     new_electricity_weights = {}
     for levy in levies:
         new_electricity_weights[levy.short_name] = st.number_input(
-            f"{levy.name} electricity weight (%): ", 0, 100
+            f"{levy.name} electricity weight (%): ",
+            0,
+            100,
+            value=levy_elec_shares.get(levy.short_name),
         )
 with col2:
     st.markdown("**:red[Gas]**")
     new_gas_weights = {}
     for levy in levies:
         new_gas_weights[levy.short_name] = st.number_input(
-            f"{levy.name} gas weight (%): ", 0, 100
+            f"{levy.name} gas weight (%): ",
+            0,
+            100,
+            value=levy_gas_shares.get(levy.short_name),
         )
 with col3:
     st.markdown("**:violet[General taxation]**")
@@ -183,7 +217,8 @@ with col1:
         if new_electricity_weights.get(levy.short_name) > 0:
             st.markdown(f"**{levy.name}**")
             new_fixed_electricity_weights[levy.short_name] = st.slider(
-                f"Electricity, fixed weight ({levy.short_name.upper()}) (%)"
+                f"Electricity, fixed weight ({levy.short_name.upper()}) (%)",
+                value=levy_fixed_shares.get(levy.short_name),
             )
             new_variable_electricity_weights[levy.short_name] = (
                 100 - new_fixed_electricity_weights[levy.short_name]
@@ -208,7 +243,8 @@ with col2:
         if new_gas_weights.get(levy.short_name) > 0:
             st.markdown(f"**{levy.name}**")
             new_fixed_gas_weights[levy.short_name] = st.slider(
-                f"Gas, fixed weight ({levy.short_name.upper()}) (%)"
+                f"Gas, fixed weight ({levy.short_name.upper()}) (%)",
+                value=levy_fixed_shares.get(levy.short_name),
             )
             new_variable_gas_weights[levy.short_name] = (
                 100 - new_fixed_gas_weights[levy.short_name]
@@ -243,58 +279,18 @@ weights = {
     }
 }
 
-# Take user input on tariff type (payment method)
+### USER INPUT: PAYMENT METHOD ###
+st.subheader("**Which payment method type would you like to model?**", divider=True)
 tariff_payment_method = st.selectbox(
     "Payment by:", ("Prepayment meter", "Standard Credit", "Other payment method")
 )
 
-if tariff_payment_method == "Other payment method":
-    elec_bills = {
-        "baseline": ElectricityOtherPayment.from_dataframe(
-            elec_other_payment_nil, elec_other_payment_typical
-        ),
-        scenario_name: ElectricityOtherPayment.from_dataframe(
-            elec_other_payment_nil, elec_other_payment_typical
-        ),
-    }
-    gas_bills = {
-        "baseline": GasOtherPayment.from_dataframe(
-            gas_other_payment_nil, gas_other_payment_typical
-        ),
-        scenario_name: GasOtherPayment.from_dataframe(
-            gas_other_payment_nil, gas_other_payment_typical
-        ),
-    }
+# Create bill objects
+elec_bills, gas_bills = get_bills(
+    tariff_payment_method, scenario_name, elec_tariff_data, gas_tariff_data
+)
 
-if tariff_payment_method == "Prepayment meter":
-    elec_bills = {
-        "baseline": ElectricityPPM.from_dataframe(elec_ppm_nil, elec_ppm_typical),
-        scenario_name: ElectricityPPM.from_dataframe(elec_ppm_nil, elec_ppm_typical),
-    }
-    gas_bills = {
-        "baseline": GasPPM.from_dataframe(gas_ppm_nil, gas_ppm_typical),
-        scenario_name: GasPPM.from_dataframe(gas_ppm_nil, gas_ppm_typical),
-    }
-
-if tariff_payment_method == "Standard Credit":
-    elec_bills = {
-        "baseline": ElectricityStandardCredit.from_dataframe(
-            elec_standard_credit_nil, elec_standard_credit_typical
-        ),
-        scenario_name: ElectricityStandardCredit.from_dataframe(
-            elec_standard_credit_nil, elec_standard_credit_typical
-        ),
-    }
-    gas_bills = {
-        "baseline": GasStandardCredit.from_dataframe(
-            gas_standard_credit_nil, gas_standard_credit_typical
-        ),
-        scenario_name: GasStandardCredit.from_dataframe(
-            gas_standard_credit_nil, gas_standard_credit_typical
-        ),
-    }
-
-# Produce scenario results
+### USER INPUT: GENERATE SCENARIO RESULTS ###
 st.subheader("**Is scenario all set?**")
 
 if st.button("Generate my scenario! 🤖"):
