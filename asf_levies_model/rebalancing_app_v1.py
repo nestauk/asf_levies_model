@@ -37,7 +37,7 @@ st.title("Policy cost levies rebalancing model V1")
 
 ### DOWNLOADING DATA ###
 st.subheader(
-    "**Downloading latest Ofgem policy cost and price cap data 🗃️**", divider=True
+    "**Downloading latest Ofgem policy cost and price cap data**", divider=True
 )
 
 # Download Annex 4 data and initialise levy objects
@@ -415,10 +415,10 @@ if st.button("Generate my scenario! 🤖"):
         x=alt.X(
             "Bill change:Q",
             axis=alt.Axis(grid=True),
-            title="Bill change from status quo (£)",
+            title="Bill change from current baseline (£)",
         ),
         y=alt.Y(
-            "ArchetypeNickname:N",
+            "Energy consumer archetype:N",
             axis=alt.Axis(grid=True, labelLimit=500),
             sort=None,
             title="Energy consumer archetype (low to high income)",
@@ -427,12 +427,6 @@ if st.button("Generate my scenario! 🤖"):
         color="ArchetypeHeatingFuel:N",
     )
     rule = chart.mark_rule(strokeDash=[2, 2]).encode(x=alt.datum(0))
-    chart = (points + rule).properties(width=1200)
-    chart = chart.configure_axisY(
-        titleAngle=0,
-        titleAlign="left",
-        titleY=-10,
-        titleX=-300,
-    )
+    chart = points + rule.properties(width=800)
 
     st.altair_chart(chart)
