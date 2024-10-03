@@ -130,6 +130,39 @@ denominators = {
     key: denominator_values for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
 }
 
+### Rebalance Baseline levies to reflect denominator choices.
+# We can't meaningfully replicate ofgem's levy denominators exactly, so we'll first rebalance
+# the levy baseline so that comparisons are internally consistent.
+# This will lead to different bill amounts to those published by ofgem.
+
+status_quo = {}
+for levy in levies:
+    status_quo[levy.short_name] = {
+        "new_electricity_weight": levy.electricity_weight,
+        "new_gas_weight": levy.gas_weight,
+        "new_tax_weight": levy.tax_weight,
+        "new_variable_weight_elec": levy.electricity_variable_weight,
+        "new_fixed_weight_elec": levy.electricity_fixed_weight,
+        "new_variable_weight_gas": levy.gas_variable_weight,
+        "new_fixed_weight_gas": levy.gas_fixed_weight,
+    }
+
+# manually update WHD weights according to denominator balance
+status_quo["whd"]["new_electricity_weight"] = denominators["whd"]["customers_elec"] / (
+    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
+)
+status_quo["whd"]["new_gas_weight"] = denominators["whd"]["customers_gas"] / (
+    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
+)
+
+# Rebalance status quo
+levies = [
+    levy.rebalance_levy(
+        **status_quo.get(levy.short_name), **denominators.get(levy.short_name)
+    )
+    for levy in levies
+]
+
 ### USER INPUT: REBALANCING WEIGHTS ###
 st.subheader(
     "**What percentage of each levy revenue should be reapportioned to :blue[electricity], :red[gas] and :violet[general taxation]?**",

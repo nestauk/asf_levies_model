@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 
-from utils.utils import _generate_docstring
+from asf_levies_model.utils.utils import _generate_docstring
 
 
 class Levy:
