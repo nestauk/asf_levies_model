@@ -323,6 +323,20 @@ elec_bills, gas_bills = get_bills(
     tariff_payment_method, scenario_name, elec_tariff_data, gas_tariff_data
 )
 
+### Update baseline bill policy costs to match denominator adjusted policy costs.
+elec_bills["baseline"].pc_nil = sum(
+    [levy.calculate_levy(0, 0, True, False) for levy in levies]
+)
+elec_bills["baseline"].pc = sum(
+    [levy.calculate_levy(1, 0, False, False) for levy in levies]
+)
+gas_bills["baseline"].pc_nil = sum(
+    [levy.calculate_levy(0, 0, False, True) for levy in levies]
+)
+gas_bills["baseline"].pc = sum(
+    [levy.calculate_levy(0, 1, False, False) for levy in levies]
+)
+
 ### USER INPUT: GENERATE SCENARIO RESULTS ###
 st.subheader("**Is scenario all set?**")
 
