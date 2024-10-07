@@ -71,6 +71,33 @@ def get_preset_weights(preset_name, customers_elec, customers_gas):
         else:
             levy_fixed_shares = default_shares
 
+    # Preset for pure status quo
+    elif preset_name == "Status quo":
+        levy_gas_shares = {
+            "ro": 0,
+            "aahedc": 0,
+            "ggl": 100,
+            "whd": round((customers_gas / (customers_elec + customers_gas)) * 100),
+            "eco": 50,
+            "fit": 0,
+        }
+        levy_elec_shares = {
+            "ro": 100,
+            "aahedc": 100,
+            "ggl": 0,
+            "whd": round((customers_elec / (customers_elec + customers_gas)) * 100),
+            "eco": 50,
+            "fit": 100,
+        }
+        levy_fixed_shares = {
+            "ro": 0,
+            "aahedc": 0,
+            "ggl": 100,
+            "whd": 100,
+            "eco": 0,
+            "fit": 0,
+        }
+
     return levy_elec_shares, levy_gas_shares, levy_fixed_shares
 
 

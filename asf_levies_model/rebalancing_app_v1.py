@@ -175,6 +175,7 @@ preset = st.selectbox(
     "Use rebalancing weights:",
     (
         "My own",
+        "Status quo",
         "All gas, status quo fixed or variable",
         "All electricity, status quo fixed or variable",
         "Status quo gas and electricity, all fixed",
