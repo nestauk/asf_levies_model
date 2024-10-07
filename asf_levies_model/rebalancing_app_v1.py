@@ -148,11 +148,15 @@ for levy in levies:
     }
 
 # manually update WHD weights according to denominator balance
-status_quo["whd"]["new_electricity_weight"] = denominators["whd"]["customers_elec"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
+status_quo["whd"]["new_electricity_weight"] = round(
+    denominators["whd"]["customers_elec"]
+    / (denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]),
+    2,
 )
-status_quo["whd"]["new_gas_weight"] = denominators["whd"]["customers_gas"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
+status_quo["whd"]["new_gas_weight"] = round(
+    denominators["whd"]["customers_gas"]
+    / (denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]),
+    2,
 )
 
 # Rebalance status quo
