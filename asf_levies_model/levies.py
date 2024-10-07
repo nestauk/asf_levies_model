@@ -960,7 +960,7 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
 
         if customers_gas and customers_elec:
             gas_weight = customers_gas / (customers_gas + customers_elec)
-            elec_weight = 100 - gas_weight
+            elec_weight = 1 - gas_weight
         else:
             gas_weight = None
             elec_weight = None
