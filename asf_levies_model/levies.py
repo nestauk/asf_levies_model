@@ -920,7 +920,7 @@ class WHD(Levy):
         )
 
     @classmethod
-    def from_dataframe(cls, df, revenue=None):
+    def from_dataframe(cls, df, revenue=None, customers_gas=None, customers_elec=None):
         """Create WHD levy instance from dataframe input.
 
         Uses the `process_data_WHD()` output from `asf_levies_model.getters.load_data` to \
@@ -929,10 +929,16 @@ initialise a WHD levy object at present values.
         As WHD has a stated scheme cost, this is used by default as the revenue, however a revenue \
 value can also be provided if a different value is required.
 
+        WHD is balanced between gas and electricity customers to produce a single rate, however \
+the ofgem spreadsheet doesn't provide sufficient information to calculate the effective gas and electric \
+shares. If customers_gas and customers_elec are provided the levy gets share information for the status quo levy.
+
         Args:
             df: a dataframe with UpdateDate, SchemeYear, TargetSpendingForSchemeYear, CoreSpending, \
 NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCoreGroup fields.
             revenue: float, a total revenue amount (£) for the levy.
+            customers_gas: int [0, inf) annual gas customers (customer or meter count).
+            customers_elec: int [0, inf) annual electricity customers (customer or meter count).
         """
         # get latest whd values from df
         latest = (
@@ -952,11 +958,18 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
         if not revenue:
             revenue = latest.TargetSpendingForSchemeYear
 
+        if customers_gas and customers_elec:
+            gas_weight = customers_gas / (customers_gas + customers_elec)
+            elec_weight = 100 - gas_weight
+        else:
+            gas_weight = None
+            elec_weight = None
+
         return cls(
             name="Warm Homes Discount",
             short_name="whd",
-            electricity_weight=0.5,
-            gas_weight=0.5,
+            electricity_weight=elec_weight,
+            gas_weight=gas_weight,
             tax_weight=0,
             electricity_variable_weight=0,
             electricity_fixed_weight=1,
