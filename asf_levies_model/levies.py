@@ -962,8 +962,8 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
             gas_weight = customers_gas / (customers_gas + customers_elec)
             elec_weight = 1 - gas_weight
         else:
-            gas_weight = None
-            elec_weight = None
+            gas_weight = np.nan
+            elec_weight = np.nan
 
         return cls(
             name="Warm Homes Discount",
