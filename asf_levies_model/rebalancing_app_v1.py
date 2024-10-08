@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import tempfile
 
 from getters.load_data import (
     download_annex_4,
@@ -40,23 +39,37 @@ st.subheader(
     "**Downloading latest Ofgem policy cost and price cap data**", divider=True
 )
 
+
+@st.cache_data
+def load_annex_4():
+    return download_annex_4(as_fileobject=True)
+
+
 # Download Annex 4 data and initialise levy objects
 with st.spinner("Downloading latest Ofgem policy cost data..."):
-    fileobject = download_annex_4(as_fileobject=True)
+    fileobject_annex4 = load_annex_4()
     levies = [
-        RO.from_dataframe(process_data_RO(fileobject), denominator=94_200_366),
-        AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=94_200_366),
-        GGL.from_dataframe(process_data_GGL(fileobject), denominator=24_503_683),
-        WHD.from_dataframe(process_data_WHD(fileobject)),
-        ECO.from_dataframe(process_data_ECO(fileobject)),
-        FIT.from_dataframe(process_data_FIT(fileobject), revenue=689_233_317),
+        RO.from_dataframe(process_data_RO(fileobject_annex4), denominator=94_200_366),
+        AAHEDC.from_dataframe(
+            process_data_AAHEDC(fileobject_annex4), denominator=94_200_366
+        ),
+        GGL.from_dataframe(process_data_GGL(fileobject_annex4), denominator=24_503_683),
+        WHD.from_dataframe(process_data_WHD(fileobject_annex4)),
+        ECO.from_dataframe(process_data_ECO(fileobject_annex4)),
+        FIT.from_dataframe(process_data_FIT(fileobject_annex4), revenue=689_233_317),
     ]
-    fileobject.close()
+    fileobject_annex4.close()
 st.success("Latest policy cost data downloaded!")
+
+
+@st.cache_data
+def load_annex_9():
+    return download_annex_9(as_fileobject=True)
+
 
 # Download Annex 9 data
 with st.spinner("Downloading latest Ofgem price cap data..."):
-    fileobject = download_annex_9(as_fileobject=True)
+    fileobject = load_annex_9()
     # Other payment
     elec_other_payment_nil = process_tariff_elec_other_payment_nil(fileobject)
     elec_other_payment_typical = process_tariff_elec_other_payment_typical(fileobject)
@@ -90,9 +103,14 @@ gas_tariff_data = {
     "standard_credit": (gas_standard_credit_nil, gas_standard_credit_typical),
 }
 
-# Load energy consumption profiles
-ofgem_archetypes_df = ofgem_archetypes_data()
 
+# Load energy consumption profiles
+@st.cache_data
+def load_archetypes():
+    return ofgem_archetypes_data()
+
+
+ofgem_archetypes_df = load_archetypes()
 
 ### USER INPUT: SCENARIO NAME ###
 # Take rebalancing scenario name
