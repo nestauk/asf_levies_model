@@ -81,7 +81,7 @@ class Levy:
         self.gas_weight = gas_weight
         self.tax_weight = tax_weight
 
-        # Levy method
+        # Method of levying
         self.electricity_variable_weight = electricity_variable_weight
         self.electricity_fixed_weight = electricity_fixed_weight
         self.gas_variable_weight = gas_variable_weight
@@ -143,6 +143,85 @@ class Levy:
             self.gas_fixed_rate * gas_customer
         )
 
+    def update_revenue(
+        self,
+        new_revenue: float,
+        supply_gas: float,
+        supply_elec: float,
+        customers_gas: int,
+        customers_elec: int,
+        overwrite: bool = True,
+        inplace: bool = False,
+    ) -> Optional["Levy"]:
+        """Update the levy revenue.
+
+                The default (overwrite = True) sets a new_revenue as revenue and updates the levy rate using
+        the provided denominators.
+
+                If overwrite is set to False, the revenue is modified by new_revenue, a positive value
+        increases revenue (i.e. revenue = revenue + new_revenue), while a negative value decreases revenue
+        (i.e. revenue = revenue - new_revenue).
+
+                Args:
+                    new_revenue: float (-inf, inf), new revenue to update existing levy revenue.
+                    supply_gas: float [0, inf) annual gas supply value (MWh).
+                    supply_elec: float [0, inf) annual electricity supply value (MWh)
+                    customers_gas: int [0, inf) annual gas customers (customer or meter count).
+                    customers_elec: int [0, inf) annual electricity customers (customer or meter count).
+                    overwrite: bool (default: True): whether to overwrite existing revenue with new_revenue or modify by new_revenue.
+                    inplace: bool (default: False): whether to update levy instance inplace or return new levy instance.
+        """
+        if overwrite & (new_revenue < 0):
+            raise ValueError(
+                "Cannot set revenue to negative value. To update revenue set overwrite to False."
+            )
+
+        if (not overwrite) & ((self.revenue + new_revenue) < 0):
+            raise ValueError("Updated revenue cannot be negative.")
+
+        # 1. Update revenue
+        if overwrite:
+            revenue = new_revenue
+        elif not overwrite:
+            revenue = self.revenue + new_revenue
+        else:
+            raise AttributeError("Error in assigning new revenue to Levy.")
+
+        # 2. Update levy rate
+        # Revenue contributions
+        revenue_gas = revenue * self.gas_weight
+        revenue_elec = revenue * self.electricity_weight
+        revenue_tax = revenue * self.tax_weight
+        # New variable levy rate
+        new_levy_var_gas = (revenue_gas / supply_gas) * self.gas_variable_weight
+        new_levy_var_elec = (
+            revenue_elec / supply_elec
+        ) * self.electricity_variable_weight
+        # New fixed levy rate
+        new_levy_fixed_gas = (revenue_gas / customers_gas) * self.gas_fixed_weight
+        new_levy_fixed_elec = (
+            revenue_elec / customers_elec
+        ) * self.electricity_fixed_weight
+
+        if inplace:
+            # Update revenue
+            self.revenue = revenue
+            self.electricity_variable_rate = new_levy_var_elec
+            self.electricity_fixed_rate = new_levy_fixed_elec
+            self.gas_variable_rate = new_levy_var_gas
+            self.gas_fixed_rate = new_levy_fixed_gas
+            self.general_taxation = revenue_tax
+        else:
+            # Return copy
+            new_levy = copy.deepcopy(self)
+            new_levy.revenue = revenue
+            new_levy.electricity_variable_rate = new_levy_var_elec
+            new_levy.electricity_fixed_rate = new_levy_fixed_elec
+            new_levy.gas_variable_rate = new_levy_var_gas
+            new_levy.gas_fixed_rate = new_levy_fixed_gas
+            new_levy.general_taxation = revenue_tax
+            return new_levy
+
     def rebalance_levy(
         self,
         new_electricity_weight: float,
@@ -160,30 +239,30 @@ class Levy:
     ) -> Optional["Levy"]:
         """Rebalance levy based on inputs.
 
-            Rebalancing is revenue-based, reapportioning revenue using the provided parameters and deriving
+                Rebalancing is revenue-based, reapportioning revenue using the provided parameters and deriving
         rates from the provided supply values or customer numbers.
 
-            It is expected that:
-                new_electricity_weight + new_gas_weight + new_tax_weight = 1
-                new_variable_weight_elec + new_fixed_weight_elec = 1 if new_electricity_weight > 0
-                new_variable_weight_gas + new_fixed_weight_gas = 1 if new_gas_weight > 0
+                It is expected that:
+                    new_electricity_weight + new_gas_weight + new_tax_weight = 1
+                    new_variable_weight_elec + new_fixed_weight_elec = 1 if new_electricity_weight > 0
+                    new_variable_weight_gas + new_fixed_weight_gas = 1 if new_gas_weight > 0
 
-            Args
-                new_electricity_weight: float [0, 1] new proportion of levy revenue to be charged to electricity.
-                new_gas_weight: float [0, 1] new proportion of levy revenue to be charged to gas.
-                new_tax_weight: float [0, 1] new proportion of levy revenue to be charged to general taxation.
-                new_variable_weight_elec: float [0, 1] new proportion of levy electricity revenue to charge based on consumption.
-                new_fixed_weight_elec: float [0, 1] new proportion of levy electricity revenue to charge based on customer numbers.
-                new_variable_weight_gas: float [0, 1] new proportion of levy gas revenue to charge based on consumption.
-                new_fixed_weight_gas: float [0, 1] new proportion of levy gas revenue to charge based on customer numbers.
-                supply_gas: float [0, inf) annual gas supply value (MWh).
-                supply_elec: float [0, inf) annual electricity supply value (MWh)
-                customers_gas: int [0, inf) annual gas customers (customer or meter count).
-                customers_elec: int [0, inf) annual electricity customers (customer or meter count).
-                inplace: bool (default: False): whether to update levy instance inplace or return new levy instance.
+                Args
+                    new_electricity_weight: float [0, 1] new proportion of levy revenue to be charged to electricity.
+                    new_gas_weight: float [0, 1] new proportion of levy revenue to be charged to gas.
+                    new_tax_weight: float [0, 1] new proportion of levy revenue to be charged to general taxation.
+                    new_variable_weight_elec: float [0, 1] new proportion of levy electricity revenue to charge based on consumption.
+                    new_fixed_weight_elec: float [0, 1] new proportion of levy electricity revenue to charge based on customer numbers.
+                    new_variable_weight_gas: float [0, 1] new proportion of levy gas revenue to charge based on consumption.
+                    new_fixed_weight_gas: float [0, 1] new proportion of levy gas revenue to charge based on customer numbers.
+                    supply_gas: float [0, inf) annual gas supply value (MWh).
+                    supply_elec: float [0, inf) annual electricity supply value (MWh)
+                    customers_gas: int [0, inf) annual gas customers (customer or meter count).
+                    customers_elec: int [0, inf) annual electricity customers (customer or meter count).
+                    inplace: bool (default: False): whether to update levy instance inplace or return new levy instance.
 
-            Raises:
-                ValueError: if rebalancing fails to maintain total revenue.
+                Raises:
+                    ValueError: if rebalancing fails to maintain total revenue.
         """
 
         # Revenue contributions
@@ -448,9 +527,8 @@ BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fi
             ForecastAnnualRPIPreviousYear=latest.ForecastAnnualRPIPreviousYear,
         )
 
-    @classmethod
+    @staticmethod
     def calculate_renewable_obligation_rate(
-        cls,
         ObligationLevel: float,
         BuyOutPriceSchemeYear: float,
         BuyOutPricePreviousYear: float,
@@ -609,16 +687,16 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
             ForecastAnnualRPIPreviousYear=latest.ForecastAnnualRPIPreviousYear,
         )
 
-    @classmethod
+    @staticmethod
     def calculate_aahedc_tariff_forecast(
-        cls, TariffPreviousYear: float, ForecastAnnualRPIPreviousYear: float
+        TariffPreviousYear: float, ForecastAnnualRPIPreviousYear: float
     ) -> float:
         """Calculate AAHEDC tariff forecast from given values."""
         return TariffPreviousYear * (1 + ForecastAnnualRPIPreviousYear / 100)
 
-    @classmethod
+    @staticmethod
     def calculate_aahedc_rate(
-        cls, TariffCurrentYear: float, aahedc_tariff_forecast: float
+        TariffCurrentYear: float, aahedc_tariff_forecast: float
     ) -> float:
         """Calculate AAHEDC rate from given values."""
         return (
@@ -751,8 +829,8 @@ or a denominator (number of meters) given to calculate it from the levy value (Â
             BackdatedLevyRate=latest.BackdatedLevyRate,
         )
 
-    @classmethod
-    def calculate_ggl_rate(cls, LevyRate: float, BackdatedLevyRate: float) -> float:
+    @staticmethod
+    def calculate_ggl_rate(LevyRate: float, BackdatedLevyRate: float) -> float:
         """Calculate Green Gas Levy rate from given values."""
         return (
             (LevyRate * 365 / 100)
@@ -842,7 +920,7 @@ class WHD(Levy):
         )
 
     @classmethod
-    def from_dataframe(cls, df, revenue=None):
+    def from_dataframe(cls, df, revenue=None, customers_gas=None, customers_elec=None):
         """Create WHD levy instance from dataframe input.
 
         Uses the `process_data_WHD()` output from `asf_levies_model.getters.load_data` to \
@@ -851,10 +929,16 @@ initialise a WHD levy object at present values.
         As WHD has a stated scheme cost, this is used by default as the revenue, however a revenue \
 value can also be provided if a different value is required.
 
+        WHD is balanced between gas and electricity customers to produce a single rate, however \
+the ofgem spreadsheet doesn't provide sufficient information to calculate the effective gas and electric \
+shares. If customers_gas and customers_elec are provided the levy gets share information for the status quo levy.
+
         Args:
             df: a dataframe with UpdateDate, SchemeYear, TargetSpendingForSchemeYear, CoreSpending, \
 NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCoreGroup fields.
             revenue: float, a total revenue amount (Â£) for the levy.
+            customers_gas: int [0, inf) annual gas customers (customer or meter count).
+            customers_elec: int [0, inf) annual electricity customers (customer or meter count).
         """
         # get latest whd values from df
         latest = (
@@ -874,11 +958,18 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
         if not revenue:
             revenue = latest.TargetSpendingForSchemeYear
 
+        if customers_gas and customers_elec:
+            gas_weight = customers_gas / (customers_gas + customers_elec)
+            elec_weight = 1 - gas_weight
+        else:
+            gas_weight = np.nan
+            elec_weight = np.nan
+
         return cls(
             name="Warm Homes Discount",
             short_name="whd",
-            electricity_weight=0.5,
-            gas_weight=0.5,
+            electricity_weight=elec_weight,
+            gas_weight=gas_weight,
             tax_weight=0,
             electricity_variable_weight=0,
             electricity_fixed_weight=1,
@@ -899,9 +990,8 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
             CompulsorySupplierFractionOfCoreGroup=latest.CompulsorySupplierFractionOfCoreGroup,
         )
 
-    @classmethod
+    @staticmethod
     def calculate_whd_rate(
-        cls,
         TargetSpendingForSchemeYear: float,
         CoreSpending: float,
         NoncoreSpending: float,
@@ -1106,9 +1196,8 @@ ObligatedSupplierVolumeElectricity, fields.
             ObligatedSupplierVolumeElectricity=latest.ObligatedSupplierVolumeElectricity,
         )
 
-    @classmethod
+    @staticmethod
     def calculate_eco_rate(
-        cls,
         AnnualisedCostECO4: float,
         AnnualisedCostGBIS: float,
         GDPDeflatorToCurrentPricesECO4: float,
@@ -1278,9 +1367,8 @@ ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fi
             ExemptSupplyEII=latest.ExemptSupplyEII,
         )
 
-    @classmethod
+    @staticmethod
     def calculate_feed_in_tariff_rate(
-        cls,
         InflatedLevelisationFund: float,
         TotalElectricitySupplied: float,
         ExemptSupplyOutsideUK: float,

@@ -267,14 +267,6 @@ weights = {
 }
 
 # %%
-weights = {
-    "100% Gas Variable": {
-        key: gas_variable_weights
-        for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
-    },
-}
-
-# %%
 scenario_outputs = process_rebalancing_scenarios(
     levies,
     weights,
