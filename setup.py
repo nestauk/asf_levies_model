@@ -24,6 +24,15 @@ setup(
     description="Analytical model of domestic energy bills and levies.",
     author="Nesta",
     license="MIT",
-    package_data={"": ["base.yaml"]},
+    package_data={
+        "": [
+            "base.yaml",
+            "archetypes_equiv_income_deciles.pkl",
+            "archetypes_headline_data.pkl",
+            "archetypes_net_income_deciles.pkl",
+            "archetypes_retired_pension.pkl",
+            "archetypes_scheme_eligibility.pkl",
+        ]
+    },
     include_package_data=True,
 )
