@@ -352,17 +352,20 @@ It is assumed that the rebalancing weights are the same for each levy.
             [consumption_profile_column],
         ]
 
-        summary_bill_costs_baseline["electricity bill incl VAT"] = elec_bills.get(
-            "baseline"
-        ).calculate_total_consumption(
-            consumption_values_df[electricity_column] / consumption_scale_factor,
-            vat=True,
+        summary_bill_costs_baseline[
+            "electricity bill incl VAT"
+        ] = consumption_values_df[electricity_column].apply(
+            lambda val: elec_bills.get("baseline").calculate_total_consumption(
+                val / consumption_scale_factor, vat=True
+            )
         )
 
-        summary_bill_costs_baseline["gas bill incl VAT"] = gas_bills.get(
-            "baseline"
-        ).calculate_total_consumption(
-            consumption_values_df[gas_column] / consumption_scale_factor, vat=True
+        summary_bill_costs_baseline["gas bill incl VAT"] = consumption_values_df[
+            gas_column
+        ].apply(
+            lambda val: gas_bills.get("baseline").calculate_total_consumption(
+                val / consumption_scale_factor, vat=True
+            )
         )
 
         summary_bill_costs_baseline["total bill incl VAT"] = (
@@ -397,17 +400,20 @@ It is assumed that the rebalancing weights are the same for each levy.
                 consumption_profile_column,
             ],
         ]
-        summary_bill_costs_scenario["electricity bill incl VAT"] = elec_bills.get(
-            scenario
-        ).calculate_total_consumption(
-            consumption_values_df[electricity_column] / consumption_scale_factor,
-            vat=True,
+        summary_bill_costs_scenario[
+            "electricity bill incl VAT"
+        ] = consumption_values_df[electricity_column].apply(
+            lambda val: elec_bills.get(scenario).calculate_total_consumption(
+                val / consumption_scale_factor, vat=True
+            )
         )
-        summary_bill_costs_scenario["gas bill incl VAT"] = gas_bills.get(
-            scenario
-        ).calculate_total_consumption(
-            consumption_values_df[gas_column] / consumption_scale_factor,
-            vat=True,
+
+        summary_bill_costs_scenario["gas bill incl VAT"] = consumption_values_df[
+            gas_column
+        ].apply(
+            lambda val: gas_bills.get(scenario).calculate_total_consumption(
+                val / consumption_scale_factor, vat=True
+            )
         )
 
         summary_bill_costs_scenario["total bill incl VAT"] = (
