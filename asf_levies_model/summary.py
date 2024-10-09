@@ -490,8 +490,11 @@ def subsidisation_table(
         Name of scenario of interest, must match a scenario name present in scenario_outputs.
     rebate : float
         Amount to discount from eligible households' bills.
+    eligibility_criteria : str
+        Criteria description, currently only accepts the following: ['Cold Weather Payments','ECO', 'Warm Homes Discount', 'Winter Fuel Payments', 'Retired Economic Status', 'Pension Guarantee Credit', 'Pension Savings Credit', 'Income Deciles'].
+        Else, a KeyError is raised.
     eligibility_dataframe : pd.DataFrame
-        Dataframe with a column of archetype names ("AnnualConsumptionProfile") and remaining columns listing the number of eligible households for a given criteria. Pre-processed dataframes include the outputs
+        Dataframe with a column of archetype names (column header "AnnualConsumptionProfile") and remaining columns listing the number of eligible households for a given criteria. Pre-processed dataframes include the outputs
         from ofgem_archetypes_scheme_eligibility(), ofgem_archetypes_retired_pension() and transform_income_decile_eligibility(ofgem_archetypes_XX_income_deciles, eligible_deciles).
     eligible_deciles : int, optional
         Number of deciles qualify for eligibility criteria if based on income, e.g. 4 corresponds to the 4 lowest income deciles; by default 0.
@@ -538,6 +541,11 @@ def subsidisation_table(
         "Pension Savings Credit": "PensionGuaranteeCreditRecipients",  # ofgem_archetypes_retired_pension()
         "Income Deciles": "IncomeDecilesEligibilitySize",  # transform_income_decile_eligibility()
     }
+
+    if eligibility_criteria not in eligibility_dict.keys():
+        raise KeyError(
+            f"Please provide criteria type from the following: {list(eligibility_dict.keys())}"
+        )
 
     # If eligibility criteria not based on income deciles
     if eligible_deciles == 0:

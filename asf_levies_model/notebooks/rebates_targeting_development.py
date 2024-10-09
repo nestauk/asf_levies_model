@@ -229,3 +229,28 @@ subsidisation_table(
 )
 
 # %%
+# Criteria from income decile table
+subsidisation_table(
+    scenario_outputs,
+    scenario_name,
+    rebate=150,
+    eligibility_criteria="Income Deciles",
+    eligibility_dataframe=transform_income_decile_eligibility(
+        ofgem_archetypes_net_income_deciles(), eligible_deciles=4
+    ),
+    eligible_deciles=4,
+    ineligible_households_pay=False,
+)
+
+# %%
+# Testing eligibility criteria validation
+subsidisation_table(
+    scenario_outputs,
+    scenario_name,
+    rebate=150,
+    eligibility_criteria="NotAScheme",
+    eligibility_dataframe=ofgem_archetypes_scheme_eligibility(),
+    ineligible_households_pay=False,
+)
+
+# %%
