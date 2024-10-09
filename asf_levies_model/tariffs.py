@@ -175,12 +175,15 @@ class Tariff:
     def calculate_total_consumption(self, consumption: float, vat: bool = False):
         """Calculate total price of tariff at given consumption value.
 
+        Zero consumption assumed to indicate off-gas. If you want the standing charge only \
+use the calculate_nil_consumption method.
+
         Args:
             consumption: float, fuel consumption in MWh.
             vat: bool, whether to add VAT at 5%, default: False.
         """
         return (
-            self.calculate_nil_consumption()
+            (self.calculate_nil_consumption() if consumption > 0 else 0)
             + self.calculate_variable_consumption(consumption)
         ) * (1.05 if vat else 1.0)
 
