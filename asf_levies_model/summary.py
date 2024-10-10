@@ -445,3 +445,160 @@ It is assumed that the rebalancing weights are the same for each levy.
     )
 
     return summary_bill_costs
+
+
+def transform_income_decile_eligibility(
+    decile_dataframe: pd.DataFrame, eligible_deciles: float
+) -> pd.DataFrame:
+    """Collapses columns of dataframes from ofgem_archetypes_equivalised_income_deciles() or ofgem_archetypes_net_income_deciles() to one column describing the total number of households in the eligible income deciles provided.
+
+    Parameters
+    ----------
+    decile_dataframe : pd.DataFrame
+        Dataframe from data loading functions ofgem_archetypes_equivalised_income_deciles() or ofgem_archetypes_net_income_deciles().
+    eligible_deciles : float
+        Desired number of eligible income deciles, e.g. 4 corresponds to the lowest 4 income deciles.
+
+    """
+    income_eligibility = decile_dataframe[
+        ["AnnualConsumptionProfile", "ArchetypeSize"]
+    ].copy(deep=True)
+
+    income_eligibility["Eligible income deciles"] = eligible_deciles
+
+    if eligible_deciles == 1:
+        income_eligibility["IncomeDecilesEligibilitySize"] = decile_dataframe.iloc[:, 2]
+
+    else:
+        income_eligibility["IncomeDecilesEligibilitySize"] = decile_dataframe.iloc[
+            :, 2 : eligible_deciles + 2
+        ].sum(axis=1)
+
+    return income_eligibility
+
+
+def subsidisation_table(
+    scenario_outputs: pd.DataFrame,
+    scenario_name: str,
+    rebate: float,
+    eligibility_criteria: str,
+    eligibility_dataframe: pd.DataFrame,
+    eligible_deciles: int = 0,
+    ineligible_households_pay: bool = True,
+) -> pd.DataFrame:
+    """Processes rebalancing scenario results to add a rebate for targeted vulnerable households.
+
+    Parameters
+    ----------
+    scenario_outputs : pd.DataFrame
+       Concatenated output dataframes from process_rebalancing_scenarios() and process_rebalancing_scenario_bills().
+    scenario_name : str
+        Name of scenario of interest, must match a scenario name present in scenario_outputs.
+    rebate : float
+        Amount to discount from eligible households' bills.
+    eligibility_criteria : str
+        Criteria description, currently only accepts the following: ['Cold Weather Payments','ECO', 'Warm Homes Discount', 'Winter Fuel Payments', 'Retired Economic Status', 'Pension Guarantee Credit', 'Pension Savings Credit', 'Income Deciles'].
+        Else, a KeyError is raised.
+    eligibility_dataframe : pd.DataFrame
+        Dataframe with a column of archetype names (column header "AnnualConsumptionProfile") and remaining columns listing the number of eligible households for a given criteria. Pre-processed dataframes include the outputs
+        from ofgem_archetypes_scheme_eligibility(), ofgem_archetypes_retired_pension() and transform_income_decile_eligibility(ofgem_archetypes_XX_income_deciles, eligible_deciles).
+    eligible_deciles : int, optional
+        Number of deciles qualify for eligibility criteria if based on income, e.g. 4 corresponds to the 4 lowest income deciles; by default 0.
+    ineligible_households_pay : bool, optional
+        Whether rebate fund should be equally distributed among ineligible household bills, by default True.
+
+    """
+
+    # Create new dataframe
+    bills = scenario_outputs[
+        (scenario_outputs["variable"] == "total bill incl VAT")
+        | (scenario_outputs["variable"] == "ArchetypeSize")
+    ]
+    bills = bills[bills["scenario"] == scenario_name]
+    bills = bills[bills.AnnualConsumptionProfile != "Typical"].reset_index(drop=True)
+    bills = bills.pivot_table(
+        index=[
+            "AnnualConsumptionProfile",
+            "scenario",
+        ],
+        columns="variable",
+        values="value",
+    ).reset_index()
+    bills = bills.rename(columns={"total bill incl VAT": "ScenarioBaseBill"})
+
+    # Add column for Current bills
+    baseline_bills = scenario_outputs[
+        (scenario_outputs["variable"] == "total bill incl VAT")
+        & (scenario_outputs["scenario"] == "Baseline")
+    ]
+    baseline_bills = baseline_bills[
+        baseline_bills.AnnualConsumptionProfile != "Typical"
+    ].reset_index()
+    bills.insert(3, "CurrentBaselineBill", baseline_bills["value"])
+
+    # Look up for eligibility criteria and column names
+    eligibility_dict = {
+        "Cold Weather Payments": "CWPEligibleSize",  # ofgem_archetypes_scheme_elibility()
+        "ECO": "ECOEligibleSize",  # ofgem_archetypes_scheme_elibility()
+        "Warm Homes Discount": "WHDEligibleSize",  # ofgem_archetypes_scheme_elibility()
+        "Winter Fuel Payments": "WFPEligibleSize",  # ofgem_archetypes_scheme_elibility()
+        "Retired Economic Status": "RetiredEconomicStatusSize",  # ofgem_archetypes_retired_pension()
+        "Pension Guarantee Credit": "PensionGuaranteeCreditRecipients",  # ofgem_archetypes_retired_pension()
+        "Pension Savings Credit": "PensionGuaranteeCreditRecipients",  # ofgem_archetypes_retired_pension()
+        "Income Deciles": "IncomeDecilesEligibilitySize",  # transform_income_decile_eligibility()
+    }
+
+    if eligibility_criteria not in eligibility_dict.keys():
+        raise KeyError(
+            f"Please provide criteria type from the following: {list(eligibility_dict.keys())}"
+        )
+
+    # If eligibility criteria not based on income deciles
+    if eligible_deciles == 0:
+        bills["EligibilityCriteria"] = eligibility_criteria
+
+    # If eligibility criteria is based on income deciles
+    else:
+        bills["EligibilityCriteria"] = (
+            str(eligible_deciles) + " Lowest " + eligibility_criteria
+        )
+
+    def find_eligible_size(row, eligibility_criteria):
+        return eligibility_dataframe.loc[
+            eligibility_dataframe["AnnualConsumptionProfile"] == row,
+            eligibility_criteria,
+        ].values[0]
+
+    # Add column for number of eligible households
+    bills["NumberOfEligibleHouseholds"] = bills["AnnualConsumptionProfile"].apply(
+        find_eligible_size, args=(eligibility_dict.get(eligibility_criteria),)
+    )
+
+    # Add column for total funds needed to provide rebate for eligible households in archetype
+    bills["TotalRequiredRebateAmount"] = rebate * bills["NumberOfEligibleHouseholds"]
+
+    # Add columns for new bill and bill change with respect to current bills for eligible households
+    bills["EligibleHouseholdBill"] = bills["ScenarioBaseBill"] - rebate
+    bills["EligibleHouseholdBillChangeFromCurrentBill"] = (
+        bills["EligibleHouseholdBill"] - bills["CurrentBaselineBill"]
+    )
+
+    # Add column for number of ineligible households
+    bills["NumberOfIneligibleHouseholds"] = (
+        bills["ArchetypeSize"] - bills["NumberOfEligibleHouseholds"]
+    )
+    rebate_fund = rebate * bills["NumberOfEligibleHouseholds"].sum()
+
+    # Add columns for new bill and bill change with respect to current bills for ineligible households
+    # If rebate mechanism does or does not involve ineligible households covering the costs
+    if ineligible_households_pay:
+        rebate_payment = rebate_fund / bills["NumberOfIneligibleHouseholds"].sum()
+        bills["IneligibleHouseholdBill"] = bills["ScenarioBaseBill"] + rebate_payment
+    else:
+        bills["IneligibleHouseholdBill"] = bills["ScenarioBaseBill"]
+
+    bills["IneligibleHouseholdBillChangeFromCurrentBill"] = (
+        bills["IneligibleHouseholdBill"] - bills["CurrentBaselineBill"]
+    )
+
+    return bills
