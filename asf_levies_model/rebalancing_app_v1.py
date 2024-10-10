@@ -28,7 +28,11 @@ from getters.load_data import (
 
 from levies import RO, AAHEDC, GGL, WHD, ECO, FIT
 
-from summary import process_rebalancing_scenarios, process_rebalancing_scenario_bills
+from summary import (
+    process_rebalancing_scenarios,
+    process_rebalancing_scenario_bills,
+    _rebalance_levies,
+)
 
 from utils.st_components import get_preset_weights, get_bills
 
@@ -413,6 +417,22 @@ if st.button("Generate my scenario! 🤖"):
     st.markdown(f"Baseline: {baseline_ratio:.2f}")
     st.markdown(f"{scenario_name}: {scenario_ratio:.2f}")
 
+    st.markdown(f"**{scenario_name} levy rates**")
+    scenario_levies = _rebalance_levies(levies, weights, denominators, scenario_name)
+    levy_rate_frame = {
+        "Levy": [levy.name for levy in levies],
+        "Electricity, variable rate (£/MWh)": [
+            levy.electricity_variable_rate for levy in levies
+        ],
+        "Electricity, fixed rate (£/customer)": [
+            levy.electricity_fixed_rate for levy in levies
+        ],
+        "Gas, variable rate (£/MWh)": [levy.gas_variable_rate for levy in levies],
+        "Gas, fixed rate (£/customer)": [levy.gas_fixed_rate for levy in levies],
+    }
+    levy_rate_frame = pd.DataFrame(levy_rate_frame)
+    st.write(pd.DataFrame(levy_rate_frame))
+
     # Summary pivot table
     summary_data = scenario_outputs.pivot_table(
         index=[
@@ -446,6 +466,7 @@ if st.button("Generate my scenario! 🤖"):
     st.markdown(
         "*Hover over the table below to download using the 'Download as CSV' button.*"
     )
+    st.markdown(f"**{scenario_name} Results")
     st.write(summary_data)
 
     # Summary figure - Dot plot
