@@ -470,7 +470,7 @@ if st.button("Generate my scenario! 🤖"):
     st.markdown(
         "*Hover over the table below to download using the 'Download as CSV' button.*"
     )
-    st.markdown(f"**{scenario_name} Results")
+    st.markdown(f"**{scenario_name} Results**")
     st.write(summary_data)
 
     # Summary figure - Dot plot
