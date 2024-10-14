@@ -1,20 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     cell_metadata_filter: -all
-#     comment_magics: true
-#     custom_cell_magics: kql
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.2
-#   kernelspec:
-#     display_name: asf_levies_model
-#     language: python
-#     name: python3
-# ---
-
 # %%
 from asf_levies_model.getters.load_data import (
     download_annex_4,
@@ -25,37 +8,21 @@ from asf_levies_model.getters.load_data import (
     process_data_ECO,
     process_data_FIT,
     download_annex_9,
-    process_tariff_elec_standard_credit_nil,
-    process_tariff_elec_standard_credit_typical,
-    process_tariff_gas_standard_credit_nil,
-    process_tariff_gas_standard_credit_typical,
-    process_tariff_elec_other_payment_nil,
-    process_tariff_elec_other_payment_typical,
-    process_tariff_gas_other_payment_nil,
-    process_tariff_gas_other_payment_typical,
-    process_tariff_elec_ppm_nil,
-    process_tariff_elec_ppm_typical,
-    process_tariff_gas_ppm_nil,
-    process_tariff_gas_ppm_typical,
+    slice_tariff_components_tables,
+    extract_single_tariff_table,
+    tidy_tariff_table,
 )
 
 from asf_levies_model.levies import RO, AAHEDC, GGL, WHD, ECO, FIT
 
-from asf_levies_model.tariffs import (
-    ElectricityStandardCredit,
-    GasStandardCredit,
-    ElectricityOtherPayment,
-    GasOtherPayment,
-    ElectricityPPM,
-    GasPPM,
-)
+from asf_levies_model.tariffs import ElectricityStandardCredit, GasStandardCredit
 
 # %% [markdown]
 # ### Policy Costs
 
 # %%
 # Example downloading annex 4
-url = "https://www.ofgem.gov.uk/sites/default/files/2024-08/Annex_4_-_Policy_cost_allowance_methodology_v1.19%20%281%29.xlsx"
+url = "https://www.ofgem.gov.uk/sites/default/files/2024-03/Annex_4_-_Policy_cost_allowance_methodology_v1.18.xlsx"
 download_annex_4(url)
 
 # %%
@@ -81,7 +48,7 @@ levies = [
 
 # %%
 # get sum of policy costs for typical consumption
-sum([levy.calculate_levy(2.7, 11.5, True, True) for levy in levies])
+sum([levy.calculate_levy(2.7, 0, True, False) for levy in levies])
 
 # %%
 # deonminators from subnational consumption estimates
@@ -228,18 +195,30 @@ sum([levy.calculate_levy(2.7, 11.5, True, True) for levy in gas_fixed_levies])
 # %%
 # Getting annex 9
 
-url = "https://www.ofgem.gov.uk/sites/default/files/2024-08/Annex_9_-_Levelisation_allowance_methodology_and_levelised_cap_levels_v1.3.xlsx"
+url = "https://www.ofgem.gov.uk/sites/default/files/2024-05/Annex%209%20-%20Levelisation%20allowance%20methodology%20and%20levelised%20cap%20levels%20v1.2.xlsx"
 download_annex_9(url)
 
 # %% [markdown]
-# #### Standard Credit
-
-# %% [markdown]
-# ##### Electricity
+# #### Electricity
 
 # %%
-elec_standard_credit_nil = process_tariff_elec_standard_credit_nil()
-elec_standard_credit_typical = process_tariff_elec_standard_credit_typical()
+elec_standard_credit_nil = tidy_tariff_table(
+    extract_single_tariff_table(
+        slice_tariff_components_tables(sheet_start_row=55, levelisation=False),
+        "Nil consumption",
+        table_number=1,
+    ),
+    "Nil consumption",
+)
+
+elec_standard_credit_typical = tidy_tariff_table(
+    extract_single_tariff_table(
+        slice_tariff_components_tables(sheet_start_row=70, levelisation=False),
+        "Typical consumption",
+        table_number=1,
+    ),
+    "Typical consumption",
+)
 
 # %%
 # Create a tariff object
@@ -263,11 +242,26 @@ elec_bill.pc = sum([levy.calculate_variable_levy(1, 0) for levy in levies])
 elec_bill.calculate_total_consumption(2.7)
 
 # %% [markdown]
-# ##### Gas
+# #### Gas
 
 # %%
-gas_standard_credit_nil = process_tariff_gas_standard_credit_nil()
-gas_standard_credit_typical = process_tariff_gas_standard_credit_typical()
+gas_standard_credit_nil = tidy_tariff_table(
+    extract_single_tariff_table(
+        slice_tariff_components_tables(sheet_start_row=55, levelisation=False),
+        "Nil consumption",
+        table_number=3,
+    ),
+    "Nil consumption",
+)
+
+gas_standard_credit_typical = tidy_tariff_table(
+    extract_single_tariff_table(
+        slice_tariff_components_tables(sheet_start_row=70, levelisation=False),
+        "Typical consumption",
+        table_number=3,
+    ),
+    "Typical consumption",
+)
 
 # %%
 # Create
@@ -287,74 +281,4 @@ gas_bill.pc = sum([levy.calculate_variable_levy(0, 1) for levy in levies])
 
 # %%
 # Check it works - its the same!
-gas_bill.calculate_total_consumption(11.5)
-
-# %% [markdown]
-# #### Other Payment Method
-
-# %% [markdown]
-# ##### Electricity
-
-# %%
-elec_other_payment_nil = process_tariff_elec_other_payment_nil()
-elec_other_payment_typical = process_tariff_elec_other_payment_typical()
-
-# %%
-# Create a tariff object
-elec_bill = ElectricityOtherPayment.from_dataframe(
-    elec_other_payment_nil, elec_other_payment_typical
-)
-
-# %%
-# This is the bill with default values.
-elec_bill.calculate_total_consumption(2.7)
-
-# %% [markdown]
-# ##### Gas
-
-# %%
-gas_other_payment_nil = process_tariff_gas_other_payment_nil()
-gas_other_payment_typical = process_tariff_gas_other_payment_typical()
-
-# %%
-# Create
-gas_bill = GasOtherPayment.from_dataframe(
-    gas_other_payment_nil, gas_other_payment_typical
-)
-
-# %%
-# This is the bill with default values.
-gas_bill.calculate_total_consumption(11.5)
-
-# %% [markdown]
-# #### PPM
-
-# %% [markdown]
-# ##### Electricity
-
-# %%
-elec_ppm_nil = process_tariff_elec_ppm_nil()
-elec_ppm_typical = process_tariff_elec_ppm_typical()
-
-# %%
-# Create a tariff object
-elec_bill = ElectricityPPM.from_dataframe(elec_ppm_nil, elec_ppm_typical)
-
-# %%
-# This is the bill with default values.
-elec_bill.calculate_total_consumption(2.7)
-
-# %% [markdown]
-# ##### Gas
-
-# %%
-gas_ppm_nil = process_tariff_gas_ppm_nil()
-gas_ppm_typical = process_tariff_gas_ppm_typical()
-
-# %%
-# Create
-gas_bill = GasPPM.from_dataframe(gas_ppm_nil, gas_ppm_typical)
-
-# %%
-# This is the bill with default values.
 gas_bill.calculate_total_consumption(11.5)

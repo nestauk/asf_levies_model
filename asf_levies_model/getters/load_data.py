@@ -1,6 +1,7 @@
 import datetime
 import numpy as np
 import pandas as pd
+
 import pandera as pa
 import re
 import warnings
@@ -201,7 +202,8 @@ def _get_charging_years(policy_df: pd.DataFrame, policy_acronym: str) -> list:
 def _check_updates_years(update_dates: list, charging_years: list):
     """Checks if number of dates of update and number of charging years are equal."""
     if len(update_dates) == len(charging_years):
-        print(f"Number of entries: {len(update_dates)}")
+        pass
+        # print(f"Number of entries: {len(update_dates)}")
     else:
         raise ValueError("Number of time periods do not match!")
 
@@ -394,7 +396,7 @@ def _get_lookup_periods(policy_df: pd.DataFrame) -> np.array:
 def _check_periods(charge_period_1: list, charge_period_2: list, lookup_period: list):
     """Checks if number of charge periods and lookup periods are equal."""
     if len(charge_period_1) == len(charge_period_2) == len(lookup_period):
-        print(f"Number of entries: {len(charge_period_1)}")
+        # print(f"Number of entries: {len(charge_period_1)}")
         return True
     else:
         return False
