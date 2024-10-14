@@ -36,6 +36,8 @@ from summary import (
 
 from utils.st_components import get_preset_weights, get_bills
 
+st.set_page_config(page_title="Nesta Levies Rebalancing Model", layout="wide")
+
 st.title("Policy cost levies rebalancing model V1")
 
 ### DOWNLOADING DATA ###
@@ -434,8 +436,34 @@ if st.button("Generate my scenario! 🤖"):
             levy.gas_fixed_rate for levy in scenario_levies
         ],
     }
-    levy_rate_frame = pd.DataFrame(levy_rate_frame)
     st.write(pd.DataFrame(levy_rate_frame))
+
+    st.markdown(f"**Non-policy costs**")
+    cost_frame = {
+        "Fuel": ["Electricity", "Gas"],
+        "Variable rate (£/MWh)": [
+            (
+                elec_bills.get("baseline").calculate_variable_consumption(1)
+                - elec_bills.get("baseline").pc
+            ),
+            (
+                gas_bills.get("baseline").calculate_variable_consumption(1)
+                - gas_bills.get("baseline").pc
+            ),
+        ],
+        "Fixed rate (£/customer)": [
+            (
+                elec_bills.get("baseline").calculate_nil_consumption()
+                - elec_bills.get("baseline").pc_nil
+            ),
+            (
+                gas_bills.get("baseline").calculate_nil_consumption()
+                - gas_bills.get("baseline").pc_nil
+            ),
+        ],
+    }
+    cost_frame = pd.DataFrame(cost_frame)
+    st.write(pd.DataFrame(cost_frame))
 
     # Summary pivot table
     summary_data = scenario_outputs.pivot_table(
