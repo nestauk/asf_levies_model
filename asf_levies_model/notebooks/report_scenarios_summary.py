@@ -647,6 +647,11 @@ all_scenarios_summary_chart = all_scenarios_summary_chart[
         "Typical", na=False
     )
 ]
+# Remove duplicate Baseline scenario rows
+mask = (all_scenarios_summary_chart["scenario"] == "1. Baseline") & (
+    all_scenarios_summary_chart["WHD Eligibility"] == "Ineligible"
+)
+all_scenarios_summary_chart = all_scenarios_summary_chart[~mask]
 
 # %% [markdown]
 # **Electricity to gas unit cost ratios**
