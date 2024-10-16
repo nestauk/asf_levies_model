@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -17,7 +18,7 @@
 
 # %%
 import pandas as pd
-
+from datetime import datetime
 from asf_levies_model.getters.load_data import (
     download_annex_4,
     download_annex_9,
@@ -32,6 +33,7 @@ from asf_levies_model.getters.load_data import (
     process_tariff_gas_other_payment_nil,
     process_tariff_gas_other_payment_typical,
     ofgem_archetypes_data,
+    ofgem_archetypes_scheme_eligibility,
 )
 
 from asf_levies_model.levies import RO, AAHEDC, GGL, WHD, ECO, FIT
@@ -42,6 +44,8 @@ from asf_levies_model.summary import (
     process_rebalancing_scenarios,
     process_rebalancing_scenario_bills,
 )
+
+from asf_levies_model import config, PROJECT_DIR
 
 # %%
 # Annex 4 and initialise levies
@@ -224,10 +228,10 @@ for rebalanced_levy in ["ro", "fit"]:
 # %%
 # Define all rebalancing weights for all scenarios
 scenario_weights = {
-    "Remove all electricity": sq_electricity_removal_weights,
-    "Remove RO and FIT": remove_ro_fit_weights,
-    "Rebalance all electricity to gas": sq_all_gas_weights,
-    "Rebalance RO and FIT to gas": rebalance_ro_fit_weights,
+    "2. Remove all electricity": sq_electricity_removal_weights,
+    "3. Remove RO and FIT": remove_ro_fit_weights,
+    "4. Rebalance all electricity to gas": sq_all_gas_weights,
+    "5. Rebalance RO and FIT to gas": rebalance_ro_fit_weights,
 }
 
 weights = {}
@@ -303,30 +307,43 @@ scenario_bill_outputs = process_rebalancing_scenario_bills(
 scenario_outputs = pd.concat([scenario_outputs, scenario_bill_outputs])
 
 # %%
-scenario_outputs
+# Reshaping to recreate Martina's table for the summary chart
+scenario_outputs["scenario"] = scenario_outputs["scenario"].replace(
+    "Baseline", "1. Baseline"
+)
 
-# %%
-# Total cost moved to general taxation
-scenarios = ["baseline"] + list(scenario_weights.keys())
-cost_to_tax = [0] + [
-    sum(
-        (
-            scenario_weights.get(scenario).get(levy.short_name).get("new_tax_weight")
-            / 100
-        )
-        * levy.revenue
-        for levy in levies
-    )
-    for scenario in scenario_weights.keys()
-]
+scenarios_summary_chart = scenario_outputs.pivot_table(
+    index=[
+        "AnnualConsumptionProfile",
+        "scenario",
+    ],
+    columns="variable",
+    values="value",
+    aggfunc="sum",
+).reset_index()
 
-cost_to_tax_data = {
-    "Scenario": scenarios,
-    "Total cost to general taxation": cost_to_tax,
-}
-cost_to_tax_df = pd.DataFrame(cost_to_tax_data)
+scenarios_summary_chart = scenarios_summary_chart[
+    [
+        "AnnualConsumptionProfile",
+        "scenario",
+        "ArchetypeHeatingFuel",
+        "ArchetypeSize",
+        "total bill incl VAT",
+    ]
+].sort_values(by=["scenario", "AnnualConsumptionProfile"])
 
-cost_to_tax_df
+# Create new column for bill change from baseline
+baseline = scenarios_summary_chart[
+    scenarios_summary_chart["scenario"] == "1. Baseline"
+].set_index("AnnualConsumptionProfile")["total bill incl VAT"]
+
+scenarios_summary_chart["Bill change from baseline"] = scenarios_summary_chart.apply(
+    lambda row: row["total bill incl VAT"]
+    - baseline.get(row["AnnualConsumptionProfile"], 0),
+    axis=1,
+)
+
+scenarios_summary_chart = scenarios_summary_chart.reset_index(drop=True)
 
 # %% [markdown]
 # **Alternative scenario with modified WHD levy object (double revenue)**
@@ -433,9 +450,10 @@ for levy in double_whd_levies:
     }
 
 # %%
+# Define all rebalancing weights for all scenarios
 alternative_scenario_weights = {
-    "Double WHD and remove all electricity": double_whd_electricity_removal_weights,
-    "Double WHD and rebalance all electricity to gas": double_whd_all_gas_weights,
+    "6. Double WHD and remove all electricity": double_whd_electricity_removal_weights,
+    "7. Double WHD and rebalance all electricity to gas": double_whd_all_gas_weights,
 }
 
 alternative_weights = {}
@@ -443,7 +461,6 @@ for scenario_name in alternative_scenario_weights.keys():
     alternative_weights[scenario_name] = alternative_scenario_weights.get(scenario_name)
 
 # %%
-# Create bill objects
 # Electricity bills
 alternative_elec_bills = {
     "baseline": ElectricityOtherPayment.from_dataframe(
@@ -514,32 +531,122 @@ alternative_scenario_outputs = pd.concat(
 )
 
 # %%
-### TO DO: Introduce rebates targeting to apply double WHD subsidy to eligible households and get final bill results
+# Reshaping to recreate Martina's table for the summary chart
+alternative_scenario_outputs["scenario"] = alternative_scenario_outputs[
+    "scenario"
+].replace("Baseline", "1. Baseline")
+
+alternative_scenarios_summary_chart = alternative_scenario_outputs.pivot_table(
+    index=[
+        "AnnualConsumptionProfile",
+        "scenario",
+    ],
+    columns="variable",
+    values="value",
+    aggfunc="sum",
+).reset_index()
+
+alternative_scenarios_summary_chart = alternative_scenarios_summary_chart[
+    [
+        "AnnualConsumptionProfile",
+        "scenario",
+        "ArchetypeHeatingFuel",
+        "ArchetypeSize",
+        "total bill incl VAT",
+    ]
+].sort_values(by=["scenario", "AnnualConsumptionProfile"])
+
+alternative_scenarios_summary_chart = alternative_scenarios_summary_chart.reset_index(
+    drop=True
+)
 
 # %%
-# Total cost moved to general taxation
-alternative_scenarios = ["baseline"] + list(alternative_scenario_weights.keys())
-cost_to_tax = [0] + [
-    sum(
-        (
-            alternative_scenario_weights.get(scenario)
-            .get(levy.short_name)
-            .get("new_tax_weight")
-            / 100
-        )
-        * levy.revenue
-        for levy in double_whd_levies
+# Need to have different bill values for WHD eligible and ineligible households
+
+# Current table is for ineligible households
+alternative_scenarios_summary_chart["WHD Eligibility"] = "Ineligible"
+
+# Add column for number of eligible households
+eligibility_size = ofgem_archetypes_scheme_eligibility()
+whd_eligibility_size = eligibility_size[
+    ["AnnualConsumptionProfile", "WHDEligibleSize"]
+].set_index("AnnualConsumptionProfile")
+alternative_scenarios_summary_chart["WHD Eligibility Size"] = (
+    alternative_scenarios_summary_chart.apply(
+        lambda row: (
+            whd_eligibility_size.loc[row["AnnualConsumptionProfile"], "WHDEligibleSize"]
+            if row["AnnualConsumptionProfile"] in whd_eligibility_size.index
+            else 0
+        ),
+        axis=1,
     )
-    for scenario in alternative_scenario_weights.keys()
+)
+# Add column for number of ineligible households
+alternative_scenarios_summary_chart["WHD Ineligibility Size"] = (
+    alternative_scenarios_summary_chart["ArchetypeSize"]
+    - alternative_scenarios_summary_chart["WHD Eligibility Size"]
+)
+
+# %%
+# Create a new dataframe for eligible households to append
+eligible_alternative_scenarios_summary_chart = alternative_scenarios_summary_chart.copy(
+    deep=True
+)
+
+# Drop Baseline scenario rows
+eligible_alternative_scenarios_summary_chart = (
+    eligible_alternative_scenarios_summary_chart[
+        ~eligible_alternative_scenarios_summary_chart["scenario"].str.contains(
+            "1. Baseline", na=False
+        )
+    ]
+)
+
+# Re-classify as eligible
+eligible_alternative_scenarios_summary_chart["WHD Eligibility"] = (
+    eligible_alternative_scenarios_summary_chart["WHD Eligibility"].replace(
+        "Ineligible", "Eligible"
+    )
+)
+
+# Apply £150 + £150 rebate to eligible households
+eligible_alternative_scenarios_summary_chart["total bill incl VAT"] = (
+    eligible_alternative_scenarios_summary_chart["total bill incl VAT"] - 300
+)
+
+# %%
+# Append eligible household rows to original dataframe
+alternative_scenarios_summary_chart = pd.concat(
+    [alternative_scenarios_summary_chart, eligible_alternative_scenarios_summary_chart]
+)
+
+# %%
+# Create new column for bill change from baseline
+baseline = alternative_scenarios_summary_chart[
+    alternative_scenarios_summary_chart["scenario"] == "1. Baseline"
+].set_index("AnnualConsumptionProfile")["total bill incl VAT"]
+
+alternative_scenarios_summary_chart["Bill change from baseline"] = (
+    alternative_scenarios_summary_chart.apply(
+        lambda row: row["total bill incl VAT"]
+        - baseline.get(row["AnnualConsumptionProfile"], 0),
+        axis=1,
+    )
+)
+
+# %% [markdown]
+# **Combine all scenario results**
+
+# %%
+all_scenarios_summary_chart = pd.concat(
+    [scenarios_summary_chart, alternative_scenarios_summary_chart]
+)
+# Remove Typical profile
+all_scenarios_summary_chart = all_scenarios_summary_chart[
+    ~all_scenarios_summary_chart["AnnualConsumptionProfile"].str.contains(
+        "Typical", na=False
+    )
 ]
-
-cost_to_tax_data = {
-    "Scenario": alternative_scenarios,
-    "Total cost to general taxation": cost_to_tax,
-}
-double_whd_cost_to_tax_df = pd.DataFrame(cost_to_tax_data)
-
-double_whd_cost_to_tax_df
 
 # %% [markdown]
 # **Electricity to gas unit cost ratios**
@@ -575,7 +682,162 @@ cost_ratio_frame = (
     .reset_index(drop=True)
 )
 
-# %%
-cost_ratio_frame
+# %% [markdown]
+# **Total cost to gas, electricity and general taxation for each scenario**
 
 # %%
+scenarios = ["baseline"] + list(scenario_weights.keys())
+cost_to_elec = [
+    sum(
+        (status_quo.get(levy.short_name).get("new_electricity_weight") / 100)
+        * levy.revenue
+        for levy in levies
+    )
+] + [
+    sum(
+        (
+            scenario_weights.get(scenario)
+            .get(levy.short_name)
+            .get("new_electricity_weight")
+            / 100
+        )
+        * levy.revenue
+        for levy in levies
+    )
+    for scenario in scenario_weights.keys()
+]
+cost_to_gas = [
+    sum(
+        (status_quo.get(levy.short_name).get("new_gas_weight") / 100) * levy.revenue
+        for levy in levies
+    )
+] + [
+    sum(
+        (
+            scenario_weights.get(scenario).get(levy.short_name).get("new_gas_weight")
+            / 100
+        )
+        * levy.revenue
+        for levy in levies
+    )
+    for scenario in scenario_weights.keys()
+]
+cost_to_tax = [0] + [
+    sum(
+        (
+            scenario_weights.get(scenario).get(levy.short_name).get("new_tax_weight")
+            / 100
+        )
+        * levy.revenue
+        for levy in levies
+    )
+    for scenario in scenario_weights.keys()
+]
+
+revenue_streams_data = {
+    "Scenario": scenarios,
+    "Total cost levied on electricity": cost_to_elec,
+    "Total cost levied on gas": cost_to_gas,
+    "Total cost to general taxation": cost_to_tax,
+}
+revenue_streams_df = pd.DataFrame(revenue_streams_data)
+
+# %%
+alternative_scenarios = ["baseline"] + list(alternative_scenario_weights.keys())
+alternative_cost_to_elec = [
+    sum(
+        (status_quo.get(levy.short_name).get("new_electricity_weight") / 100)
+        * levy.revenue
+        for levy in double_whd_levies
+    )
+] + [
+    sum(
+        (
+            alternative_scenario_weights.get(scenario)
+            .get(levy.short_name)
+            .get("new_electricity_weight")
+            / 100
+        )
+        * levy.revenue
+        for levy in double_whd_levies
+    )
+    for scenario in alternative_scenario_weights.keys()
+]
+alternative_cost_to_gas = [
+    sum(
+        (status_quo.get(levy.short_name).get("new_gas_weight") / 100) * levy.revenue
+        for levy in double_whd_levies
+    )
+] + [
+    sum(
+        (
+            alternative_scenario_weights.get(scenario)
+            .get(levy.short_name)
+            .get("new_gas_weight")
+            / 100
+        )
+        * levy.revenue
+        for levy in double_whd_levies
+    )
+    for scenario in alternative_scenario_weights.keys()
+]
+alternative_cost_to_tax = [0] + [
+    sum(
+        (
+            alternative_scenario_weights.get(scenario)
+            .get(levy.short_name)
+            .get("new_tax_weight")
+            / 100
+        )
+        * levy.revenue
+        for levy in double_whd_levies
+    )
+    for scenario in alternative_scenario_weights.keys()
+]
+
+alternative_revenue_streams_data = {
+    "Scenario": alternative_scenarios,
+    "Total cost levied on electricity": alternative_cost_to_elec,
+    "Total cost levied on gas": alternative_cost_to_gas,
+    "Total cost to general taxation": alternative_cost_to_tax,
+}
+double_whd_revenue_streams_df = pd.DataFrame(alternative_revenue_streams_data)
+
+# %%
+scenarios_revenue_streams = pd.concat(
+    [revenue_streams_df, double_whd_revenue_streams_df]
+).reset_index(drop=True)
+scenarios_revenue_streams["Scenario"] = scenarios_revenue_streams["Scenario"].replace(
+    "baseline", "1. Baseline"
+)
+scenarios_revenue_streams["Total policy cost revenue"] = (
+    scenarios_revenue_streams["Total cost levied on electricity"]
+    + scenarios_revenue_streams["Total cost levied on gas"]
+    + scenarios_revenue_streams["Total cost to general taxation"]
+)
+scenarios_revenue_streams = scenarios_revenue_streams.drop(5).reset_index(drop=True)
+
+# %% [markdown]
+# **Saving all output dataframes to Excel workbook**
+
+# %%
+# Get today's date
+today = datetime.now()
+
+# Format today's date (e.g., YYYY-MM-DD)
+date_str = today.strftime("%Y%m%d")
+
+# Define the filename with today's date
+filename = f"{PROJECT_DIR}/outputs/data/scenarios_data_{date_str}.xlsx"
+
+# %%
+# Create an Excel writer object
+with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
+    # Write each DataFrame to a different sheet
+    all_scenarios_summary_chart.to_excel(
+        writer, sheet_name="All scenarios summary", index=False
+    )
+    cost_ratio_frame.to_excel(writer, sheet_name="Scenario cost ratios", index=False)
+    scenarios_revenue_streams.to_excel(
+        writer, sheet_name="Scenario revenue streams", index=False
+    )
