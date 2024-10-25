@@ -105,19 +105,12 @@ for levy in levies:
     }
 
 # manually update WHD weights according to denominator balance
-status_quo["whd"]["new_electricity_weight"] = round(
-    (
-        denominators["whd"]["customers_elec"]
-        / (denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"])
-    ),
-    2,
+status_quo["whd"]["new_electricity_weight"] = denominators["whd"]["customers_elec"] / (
+    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
 )
-status_quo["whd"]["new_gas_weight"] = round(
-    (
-        denominators["whd"]["customers_gas"]
-        / (denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"])
-    ),
-    2,
+
+status_quo["whd"]["new_gas_weight"] = denominators["whd"]["customers_gas"] / (
+    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
 )
 
 # rebalance baseline levies
@@ -376,19 +369,12 @@ for levy in double_whd_levies:
     }
 
 # manually update WHD weights according to denominator balance
-status_quo["whd"]["new_electricity_weight"] = round(
-    (
-        denominators["whd"]["customers_elec"]
-        / (denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"])
-    ),
-    2,
+status_quo["whd"]["new_electricity_weight"] = denominators["whd"]["customers_elec"] / (
+    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
 )
-status_quo["whd"]["new_gas_weight"] = round(
-    (
-        denominators["whd"]["customers_gas"]
-        / (denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"])
-    ),
-    2,
+
+status_quo["whd"]["new_gas_weight"] = denominators["whd"]["customers_gas"] / (
+    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
 )
 
 # rebalance baseline levies
@@ -402,6 +388,11 @@ double_whd_levies = [
 # %%
 # Double WHD revenue
 double_whd_levies[3].revenue = double_whd_levies[3].revenue * 2
+
+# double_whd_levies[3] = double_whd_levies[3].update_revenue(
+#    new_revenue=double_whd_levies[3].revenue * 2,
+#    **denominators[double_whd_levies[3].short_name])
+
 
 # %%
 # Rebalancing scenario 6: double WHD, full removal on electricity
