@@ -79,33 +79,31 @@ denominators = {
 
 # %%
 # Create meta levy of all levies charged on electricity or gas units
-AllVar = Levy
-AllVar.name = "All levies"
-
-# Add revenue of levies that are on variable charges
-# RO, AAHEDC, ECO, FIT
+# Add revenue of levies that are on variable charges, RO, AAHEDC, ECO, FIT
 ro = levies[0]
 aahedc = levies[1]
 eco = levies[4]
 fit = levies[5]
-AllVar.revenue = ro.revenue + aahedc.revenue + eco.revenue + fit.revenue
 
-AllVar.electricity_weight = 1
-AllVar.gas_weight = 0
-AllVar.tax_weight = 0
+revenue = ro.revenue + aahedc.revenue + eco.revenue + fit.revenue
 
-AllVar.electricity_variable_weight = 1
-AllVar.electricity_fixed_weight = 0
-
-AllVar.gas_variable_weight = 1
-AllVar.gas_fixed_weight = 1
-
-AllVar.electricity_variable_rate = AllVar.revenue / supply_elec
-AllVar.electricity_fixed_rate = 0
-AllVar.gas_variable_rate = 0
-AllVar.gas_fixed_rate = 0
-
-AllVar.general_taxation = 0
+AllVar = Levy(
+    name="All levies charged on a unit (variable) basis",
+    short_name="All levies",
+    revenue=revenue,
+    electricity_weight=1,
+    gas_weight=0,
+    tax_weight=0,
+    electricity_variable_weight=1,
+    electricity_fixed_weight=0,
+    gas_variable_weight=1,
+    gas_fixed_weight=1,
+    electricity_variable_rate=revenue / supply_elec,
+    electricity_fixed_rate=0,
+    gas_variable_rate=0,
+    gas_fixed_rate=0,
+    general_taxation=0,
+)
 
 # %%
 # Annex 9 and initialise tariffs (Other Payment method)
@@ -132,7 +130,6 @@ ratios = []
 for weight in gas_weights:
 
     rebalanced_levy = AllVar.rebalance_levy(
-        AllVar,
         new_electricity_weight=1 - weight,
         new_gas_weight=weight,
         new_tax_weight=0,
@@ -144,18 +141,17 @@ for weight in gas_weights:
         supply_elec=supply_elec,
         customers_gas=customers_gas,
         customers_elec=customers_elec,
-        inplace=False,
     )
 
     elec_bill.pc_nil = rebalanced_levy.calculate_fixed_levy(
-        rebalanced_levy, electricity_customer=True, gas_customer=False
+        electricity_customer=True, gas_customer=False
     )
-    elec_bill.pc = rebalanced_levy.calculate_variable_levy(rebalanced_levy, 1, 0)
+    elec_bill.pc = rebalanced_levy.calculate_variable_levy(1, 0)
 
     gas_bill.pc_nil = rebalanced_levy.calculate_fixed_levy(
-        rebalanced_levy, electricity_customer=False, gas_customer=True
+        electricity_customer=False, gas_customer=True
     )
-    gas_bill.pc = rebalanced_levy.calculate_variable_levy(rebalanced_levy, 0, 1)
+    gas_bill.pc = rebalanced_levy.calculate_variable_levy(0, 1)
 
     ratios.append(
         elec_bill.calculate_variable_consumption(1)
@@ -183,7 +179,6 @@ superimposed_ratios = []
 for weight in superimposed_gas_weights:
 
     rebalanced_levy = AllVar.rebalance_levy(
-        AllVar,
         new_electricity_weight=1 - weight,
         new_gas_weight=weight,
         new_tax_weight=0,
@@ -199,14 +194,14 @@ for weight in superimposed_gas_weights:
     )
 
     elec_bill.pc_nil = rebalanced_levy.calculate_fixed_levy(
-        rebalanced_levy, electricity_customer=True, gas_customer=False
+        electricity_customer=True, gas_customer=False
     )
-    elec_bill.pc = rebalanced_levy.calculate_variable_levy(rebalanced_levy, 1, 0)
+    elec_bill.pc = rebalanced_levy.calculate_variable_levy(1, 0)
 
     gas_bill.pc_nil = rebalanced_levy.calculate_fixed_levy(
-        rebalanced_levy, electricity_customer=False, gas_customer=True
+        electricity_customer=False, gas_customer=True
     )
-    gas_bill.pc = rebalanced_levy.calculate_variable_levy(rebalanced_levy, 0, 1)
+    gas_bill.pc = rebalanced_levy.calculate_variable_levy(0, 1)
 
     superimposed_ratios.append(
         elec_bill.calculate_variable_consumption(1)
@@ -265,5 +260,3 @@ plt.plot(
     color="blue",
     linestyle="--",
 )
-
-# %%
