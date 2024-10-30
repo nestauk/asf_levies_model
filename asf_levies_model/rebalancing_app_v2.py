@@ -187,21 +187,24 @@ st.markdown(
     "Results below show the effects of your rebalancing approach on the [**electricity to gas unit cost ratio**](https://www.nesta.org.uk/blog/the-electricity-to-gas-price-ratio-explained-how-a-green-ratio-would-make-bills-cheaper-and-greener/) and the energy bills of different [**UK energy consumer archetypes**](https://www.cse.org.uk/research-consultancy/consultancy-projects/consumer-archetypes-for-ofgem/)."
 )
 
+scenario_name = "Rebalanced"
+
+# Initialise session state for selections
+if "preset" not in st.session_state:
+    st.session_state.preset = "Status quo"
+if "mode" not in st.session_state:
+    st.session_state.mode = {
+        levy.short_name: "Rebalance between electricity and gas" for levy in levies
+    }
+if "tariff_payment_method" not in st.session_state:
+    st.session_state.tariff_payment_method = "Other payment method"
+
 # Show selectors for rebalancing scenario in sidebar
 with st.sidebar:
     st.info(
         "**Create your own rebalancing scenario** by adjusting the settings below. *Note: You can manually hide or adjust the width of this sidebar.*"
     )
 
-    # # User input: Scenario name
-    # st.subheader("1. Name your scenario")
-    # st.markdown("Note: Naming it *Baseline* breaks the results table")
-    # scenario_name = st.text_input("Enter scenario name:", "My scenario")
-    # if not scenario_name:
-    #     st.error("Please provide a scenario name.")
-    scenario_name = "Rebalanced"
-
-    ### TO DO: Finalise presets
     # User input: Preset or custom weights
     st.subheader("1. Choose rebalancing or removal for each levy")
     preset_options = [
@@ -211,12 +214,15 @@ with st.sidebar:
         "Status quo gas and electricity, all fixed",
         "Status quo gas and electricity, all variable",
     ]
-    default_index = preset_options.index("Status quo")
     preset = st.selectbox(
         "Do you want to start with a preset approach?",
         preset_options,
-        index=default_index,
+        index=preset_options.index(st.session_state.preset),
     )
+
+    # Update session state
+    st.session_state.preset = preset
+
     levy_elec_shares, levy_gas_shares, levy_fixed_shares = get_preset_weights(
         preset,
         denominator_values["customers_elec"],
@@ -237,17 +243,26 @@ with st.sidebar:
     new_tax_weights = {}
 
     # User inputs: Rebalancing weights for each levy
+    mode = {levy.short_name: "Rebalance between electricity and gas" for levy in levies}
     for levy in levies:
         st.markdown(f"**{levy.name}**")
 
-        mode = st.radio(
+        mode[levy.short_name] = st.radio(
             f"Rebalance or remove {levy.short_name.upper()}",
             [
                 "Rebalance between electricity and gas",
                 "Remove off bills to general taxation",
             ],
+            index=[
+                "Rebalance between electricity and gas",
+                "Remove off bills to general taxation",
+            ].index(st.session_state.mode[levy.short_name]),
         )
-        if mode == "Rebalance between electricity and gas":
+
+        # Update session state
+        st.session_state.mode[levy.short_name] = mode[levy.short_name]
+
+        if mode[levy.short_name] == "Rebalance between electricity and gas":
             new_tax_weights[levy.short_name] = 0
             new_gas_weights[levy.short_name] = st.slider(
                 f"{levy.short_name.upper()}: electricity (0) <-> gas (100)",
@@ -260,80 +275,6 @@ with st.sidebar:
             new_electricity_weights[levy.short_name] = 0
             new_gas_weights[levy.short_name] = 0
             new_tax_weights[levy.short_name] = 100
-
-        # ALTERNATIVE BLOCK
-        # removal_setting = st.radio(
-        #     f"Remove revenue from {levy.short_name.upper()} to general taxation?",
-        #     ["No", "Yes"],
-        # )
-        # if removal_setting == "Yes":
-        #     removal_mode = st.radio(
-        #         f"Remove {levy.short_name.upper()} revenue as percentage or amount:",
-        #         ["Percentage", "Amount"],
-        #     )
-        #     if removal_mode == "Percentage":
-        #         new_tax_weights[levy.short_name] = st.number_input(
-        #             f"{levy.short_name.upper()} tax (%): ", 0, 100, 100
-        #         )
-        #         if new_tax_weights[levy.short_name] == 100:
-        #             new_electricity_weights[levy.short_name] = 0
-        #             new_gas_weights[levy.short_name] = 0
-        #         else:
-        #             new_gas_weights[levy.short_name] = st.slider(
-        #                 f"{levy.short_name.upper()}: electricity <-> gas",
-        #                 min_value=0,
-        #                 max_value=100 - new_tax_weights[levy.short_name],
-        #             )
-        #             new_electricity_weights[levy.short_name] = (
-        #                 100 - new_gas_weights[levy.short_name]
-        #             )
-        #     else:
-        #         removal_amount = st.number_input(
-        #             f"{levy.short_name.upper()} revenue to remove: "
-        #         )
-        #         new_tax_weights[levy.short_name] = removal_amount / levy.revenue
-        #         if new_tax_weights[levy.short_name] == 100:
-        #             new_electricity_weights[levy.short_name] = 0
-        #             new_gas_weights[levy.short_name] = 0
-        #         else:
-        #             new_gas_weights[levy.short_name] = st.slider(
-        #                 f"{levy.short_name.upper()}: electricity <-> gas",
-        #                 min_value=0,
-        #                 max_value=100 - new_tax_weights[levy.short_name],
-        #             )
-        #             new_electricity_weights[levy.short_name] = (
-        #                 100 - new_gas_weights[levy.short_name]
-        #             )
-        # else:
-        #     new_tax_weights[levy.short_name] = 0
-        #     new_gas_weights[levy.short_name] = st.slider(
-        #         f"{levy.short_name.upper()}: electricity (0) <-> gas (100)",
-        #         value=levy_gas_shares.get(levy.short_name),
-        #     )
-        #     new_electricity_weights[levy.short_name] = (
-        #         100 - new_gas_weights[levy.short_name]
-        #     )
-
-        # ALTERNATIVE BLOCK
-        # col1, col2, col3 = st.columns(3)
-        # with col1:
-        #     new_electricity_weights[levy.short_name] = st.number_input(
-        #         f"{levy.short_name.upper()} electricity (%): ",
-        #         0,
-        #         100,
-        #         value=levy_elec_shares.get(levy.short_name),
-        #     )
-        # with col2:
-        #     new_gas_weights[levy.short_name] = st.number_input(
-        #         f"{levy.short_name.upper()} gas (%): ",
-        #         0,
-        #         100,
-        #         value=levy_gas_shares.get(levy.short_name),
-        #     )
-        # with col3:
-        #     new_tax_weights[levy.short_name] = st.number_input(
-        #         f"{levy.short_name.upper()} tax (%): ", 0, 100
-        #     )
 
         # Summation check
         if (
@@ -374,8 +315,28 @@ with st.sidebar:
     st.subheader("2. Choose payment method")
     tariff_payment_method = st.selectbox(
         "Payment method:",
-        ("Prepayment meter", "Standard Credit", "Other payment method"),
+        ["Prepayment meter", "Standard Credit", "Other payment method"],
+        index=["Prepayment meter", "Standard Credit", "Other payment method"].index(
+            st.session_state.tariff_payment_method
+        ),
     )
+    # Update session state
+    st.session_state.tariff_payment_method = tariff_payment_method
+
+    # Reset button
+    def reset_selection():
+        st.session_state.preset = "Status quo"
+        st.session_state.mode = {
+            levy.short_name: "Rebalance between electricity and gas" for levy in levies
+        }
+        st.session_state.tariff_payment_method = "Other payment method"
+
+    st.button("Reset settings", on_click=reset_selection)
+
+    # # FOR TESTING: Monitor what is happening with session_state
+    # st.write(st.session_state.preset)
+    # st.write(st.session_state.mode[levy.short_name] for levy in levies)
+    # st.write(st.session_state.tariff_payment_method)
 
 # Create dictionary of rebalancing scenario weights
 weights = {
@@ -508,7 +469,7 @@ ratio_data = pd.DataFrame(
 # Print unit cost summary chart
 st.subheader("Rebalanced scenario: Electricity and gas unit costs")
 
-cmap_1 = {"Electricity": "#0000ff", "Gas": "#18a48c"}
+cmap_1 = {"Electricity": "#18a48c", "Gas": "#0000ff"}
 unit_bar_chart = (
     alt.Chart(unit_cost_data)
     .mark_bar()
@@ -521,11 +482,16 @@ unit_bar_chart = (
         ),
     )
 ).properties(width=800)
-unit_labels = unit_bar_chart.mark_text(align="center", baseline="middle", dx=60).encode(
+
+# Weird things are happening with the alignment of labels - to fix in the future
+unit_labels = unit_bar_chart.mark_text(align="center", baseline="middle", dx=30).encode(
+    x=alt.X("Fuel:N", title=None, axis=None),
+    y="Scenario:N",
     text=alt.Text("Unit cost (£/kWh):Q", format=".2f"),
     color=alt.value("white"),
 )
 unit_cost_chart = alt.layer(unit_bar_chart, unit_labels)
+
 unit_cost_chart = unit_cost_chart.configure_axis(
     labelColor="black", titleColor="black"
 ).configure_legend(labelColor="black", titleColor="black")
@@ -579,9 +545,9 @@ chart_data = pd.concat(
 chart = alt.Chart(chart_data)
 
 cmap_2 = {
-    "Electricity": "#0000ff",
+    "Electricity": "#18a48c",
     "Electricity/Other": "#fdb633",
-    "Gas": "#18a48c",
+    "Gas": "#0000ff",
     "Other": "#f6a4b7",
 }
 points = chart.mark_point(opacity=1, filled=True).encode(
@@ -595,12 +561,13 @@ points = chart.mark_point(opacity=1, filled=True).encode(
         "Energy consumer archetype:N",
         axis=alt.Axis(grid=True, labelLimit=500),
         sort=None,
-        title="Energy consumer archetype (low to high income)",
+        title="Energy consumer archetype (Lowest (A) to highest (J) income)",
     ),
-    size="ArchetypeSize:Q",
+    size=alt.Size("ArchetypeSize:Q", title="No. of households"),
     color=alt.Color(
         "ArchetypeHeatingFuel:N",
         scale=alt.Scale(domain=list(cmap_2.keys()), range=list(cmap_2.values())),
+        title="Main heating fuel",
     ),
 )
 rule = chart.mark_rule(strokeDash=[2, 2]).encode(x=alt.datum(0))
@@ -611,6 +578,9 @@ summary_chart = summary_chart.configure_axis(
 
 # Print distributional effects summary chart
 st.altair_chart(summary_chart)
+st.markdown(
+    "*Note: The archetype size for the Typical archetype is arbitrarily set at 1,000,000 households as a placeholder.*"
+)
 
 # Option to view results table
 if st.button("View distributional impacts results table"):
