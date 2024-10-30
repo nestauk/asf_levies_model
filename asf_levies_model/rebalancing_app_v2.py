@@ -248,9 +248,6 @@ with st.sidebar:
         ),
     )
 
-    st.session_state["preset"]
-    st.session_state["levy_elec_shares"]
-
     st.markdown(
         "*For each policy cost scheme, you have the option to (a) rebalance between electricity and gas, then rebalance between fixed (standing charge) and variable (unit cost) charging, or (b) remove policy cost off of energy bills.*"
     )
@@ -286,6 +283,7 @@ with st.sidebar:
             new_gas_weights[levy.short_name] = st.slider(
                 f"{levy.short_name.upper()}: electricity (0) <-> gas (100)",
                 value=st.session_state["levy_gas_shares"].get(levy.short_name),
+                key=f"{levy.short_name}_gas_weights",
             )
             new_electricity_weights[levy.short_name] = (
                 100 - new_gas_weights[levy.short_name]
@@ -309,6 +307,7 @@ with st.sidebar:
             new_fixed_electricity_weights[levy.short_name] = st.slider(
                 f"{levy.short_name.upper()} electricity: variable (0) <-> fixed (100)",
                 value=st.session_state["levy_fixed_shares"].get(levy.short_name),
+                key=f"{levy.short_name}_electricity_fixed_shares",
             )
             new_variable_electricity_weights[levy.short_name] = (
                 100 - new_fixed_electricity_weights[levy.short_name]
@@ -322,6 +321,7 @@ with st.sidebar:
             new_fixed_gas_weights[levy.short_name] = st.slider(
                 f"{levy.short_name.upper()} gas: variable (0) <-> fixed (100)",
                 value=st.session_state["levy_fixed_shares"].get(levy.short_name),
+                key=f"{levy.short_name}_gas_fixed_shares",
             )
             new_variable_gas_weights[levy.short_name] = (
                 100 - new_fixed_gas_weights[levy.short_name]
@@ -335,7 +335,7 @@ with st.sidebar:
     tariff_payment_method = st.selectbox(
         "Payment method:",
         ["Prepayment meter", "Standard Credit", "Other payment method"],
-        index=1,
+        index=2,
         key="tariff_payment_method",
     )
 
@@ -344,13 +344,13 @@ with st.sidebar:
         # Delete the session states for the widgets
         # This should force them to re-initialise
         st.session_state["preset"] = "Status quo"
-        st.session_state["ro_radio"] = "Rebalance between electricity and gas"
-        st.session_state["aahedc_radio"] = "Rebalance between electricity and gas"
-        st.session_state["ggl_radio"] = "Rebalance between electricity and gas"
-        st.session_state["whd_radio"] = "Rebalance between electricity and gas"
-        st.session_state["eco_radio"] = "Rebalance between electricity and gas"
-        st.session_state["fit_radio"] = "Rebalance between electricity and gas"
-        st.session_state["tariff_payment_method"] = "Standard Credit"
+
+        for levy in levies:
+            st.session_state[f"{levy.short_name}_radio"] = (
+                "Rebalance between electricity and gas"
+            )
+
+        st.session_state["tariff_payment_method"] = "Other payment method"
         st.session_state["levy_elec_shares"], _, _ = get_preset_weights(
             "Status quo",
             denominator_values["customers_elec"],
@@ -367,12 +367,18 @@ with st.sidebar:
             denominator_values["customers_gas"],
         )
 
-    st.button("Reset settings", on_click=reset_selection)
+        for levy in levies:
+            st.session_state[f"{levy.short_name}_gas_weights"] = st.session_state[
+                "levy_gas_shares"
+            ].get(levy.short_name)
+            st.session_state[f"{levy.short_name}_electricity_fixed_shares"] = (
+                st.session_state["levy_fixed_shares"].get(levy.short_name)
+            )
+            st.session_state[f"{levy.short_name}_gas_fixed_shares"] = st.session_state[
+                "levy_fixed_shares"
+            ].get(levy.short_name)
 
-    # # FOR TESTING: Monitor what is happening with session_state
-    # st.write(st.session_state.preset)
-    # st.write(st.session_state.mode[levy.short_name] for levy in levies)
-    # st.write(st.session_state.tariff_payment_method)
+    st.button("Reset settings", on_click=reset_selection)
 
 # Create dictionary of rebalancing scenario weights
 weights = {
@@ -506,7 +512,7 @@ ratio_data = pd.DataFrame(
 st.subheader("Rebalanced scenario: Electricity and gas unit costs")
 
 cmap_1 = {"Electricity": "#18a48c", "Gas": "#0000ff"}
-unit_bar_chart = (
+unit_cost_chart = (
     alt.Chart(unit_cost_data)
     .mark_bar()
     .encode(
@@ -520,13 +526,13 @@ unit_bar_chart = (
 ).properties(width=800)
 
 # Weird things are happening with the alignment of labels - to fix in the future
-unit_labels = unit_bar_chart.mark_text(align="center", baseline="middle", dx=30).encode(
-    x=alt.X("Fuel:N", title=None, axis=None),
-    y="Scenario:N",
-    text=alt.Text("Unit cost (£/kWh):Q", format=".2f"),
-    color=alt.value("white"),
-)
-unit_cost_chart = alt.layer(unit_bar_chart, unit_labels)
+# unit_labels = unit_bar_chart.mark_text(align="center", baseline="middle", dx=30).encode(
+#     x=alt.X("Fuel:N", title=None, axis=None),
+#     y="Scenario:N",
+#     text=alt.Text("Unit cost (£/kWh):Q", format=".2f"),
+#     color=alt.value("white"),
+# )
+# unit_cost_chart = alt.layer(unit_bar_chart, unit_labels)
 
 unit_cost_chart = unit_cost_chart.configure_axis(
     labelColor="black", titleColor="black"
