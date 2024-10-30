@@ -176,18 +176,21 @@ gas_tariff_data = {
 # Lay out header section
 row1_1, row1_2 = st.columns((2, 3))
 with row1_1:
-    st.title("Nesta Levies Rebalancing Model")  ### TO DO: Workshop title
+    st.title("Nesta Green Levies Rebalancing Model")  ### TO DO: Workshop title
 
 with row1_2:
-    st.markdown("###")
+    st.markdown("######")
     st.markdown(
-        "This model was created as part of Nesta's project on [making energy cheaper by rebalancing levies](https://www.nesta.org.uk/project/finding-ways-to-deliver-cheaper-electricity-by-rebalancing-levies/)."
+        "**What is this tool?** As part of Nesta's project on [making energy cheaper by rebalancing levies](https://www.nesta.org.uk/project/finding-ways-to-deliver-cheaper-electricity-by-rebalancing-levies/), this tool allows you to model different approaches to rebalancing policy costs between electricity and gas levies, or removing them off bills to general taxation."
     )
+st.markdown(
+    "Results below show the effects of your rebalancing approach on the [**electricity to gas unit cost ratio**](https://www.nesta.org.uk/blog/the-electricity-to-gas-price-ratio-explained-how-a-green-ratio-would-make-bills-cheaper-and-greener/) and the energy bills of different [**UK energy consumer archetypes**](https://www.cse.org.uk/research-consultancy/consultancy-projects/consumer-archetypes-for-ofgem/)."
+)
 
 # Show selectors for rebalancing scenario in sidebar
 with st.sidebar:
     st.info(
-        "**Create your own rebalancing scenario.** More information to go here. You can manually hide or adjust the width of the sidebar."
+        "**Create your own rebalancing scenario** by adjusting the settings below. *Note: You can manually hide or adjust the width of this sidebar.*"
     )
 
     # # User input: Scenario name
@@ -196,13 +199,12 @@ with st.sidebar:
     # scenario_name = st.text_input("Enter scenario name:", "My scenario")
     # if not scenario_name:
     #     st.error("Please provide a scenario name.")
-    scenario_name = "Rebalanced scenario"
+    scenario_name = "Rebalanced"
 
     ### TO DO: Finalise presets
     # User input: Preset or custom weights
     st.subheader("1. Choose rebalancing or removal for each levy")
     preset_options = [
-        "My own",
         "Status quo",
         "All gas, status quo fixed or variable",
         "All electricity, status quo fixed or variable",
@@ -211,12 +213,18 @@ with st.sidebar:
     ]
     default_index = preset_options.index("Status quo")
     preset = st.selectbox(
-        "Use custom or preset settings:", preset_options, index=default_index
+        "Do you want to start with a preset approach?",
+        preset_options,
+        index=default_index,
     )
     levy_elec_shares, levy_gas_shares, levy_fixed_shares = get_preset_weights(
         preset,
         denominator_values["customers_elec"],
         denominator_values["customers_gas"],
+    )
+
+    st.markdown(
+        "*For each policy cost scheme, you have the option to (a) rebalance between electricity and gas, then rebalance between fixed (standing charge) and variable (unit cost) charging, or (b) remove policy cost off of energy bills.*"
     )
 
     # Create dictionaries for rebalancing weights
@@ -471,6 +479,75 @@ summary_data = summary_data[
 ]
 ### TO DO: Re-name column headers
 
+# Calculate electricity to gas unit cost and ratios
+unit_costs = [
+    elec_bills.get("baseline").calculate_variable_consumption(1),
+    gas_bills.get("baseline").calculate_variable_consumption(1),
+    elec_bills.get(scenario_name).calculate_variable_consumption(1),
+    gas_bills.get(scenario_name).calculate_variable_consumption(1),
+]
+unit_costs = [unit_cost / 1000 for unit_cost in unit_costs]
+scenarios = ["Baseline", "Baseline", scenario_name, scenario_name]
+fuel = ["Electricity", "Gas", "Electricity", "Gas"]
+
+unit_cost_data = pd.DataFrame(
+    {"Scenario": scenarios, "Fuel": fuel, "Unit cost (£/kWh)": unit_costs}
+)
+
+ratios = [
+    elec_bills.get("baseline").calculate_variable_consumption(1)
+    / gas_bills.get("baseline").calculate_variable_consumption(1),
+    elec_bills.get(scenario_name).calculate_variable_consumption(1)
+    / gas_bills.get(scenario_name).calculate_variable_consumption(1),
+]
+ratio_scenarios = ["Baseline", scenario_name]
+ratio_data = pd.DataFrame(
+    {"Scenario": ratio_scenarios, "Electricity to gas unit cost ratio": ratios}
+)
+
+# Print unit cost summary chart
+st.subheader("Rebalanced scenario: Electricity and gas unit costs")
+
+cmap_1 = {"Electricity": "#0000ff", "Gas": "#18a48c"}
+unit_bar_chart = (
+    alt.Chart(unit_cost_data)
+    .mark_bar()
+    .encode(
+        y="Scenario:N",
+        x="Unit cost (£/kWh):Q",
+        color=alt.Color(
+            "Fuel",
+            scale=alt.Scale(domain=list(cmap_1.keys()), range=list(cmap_1.values())),
+        ),
+    )
+).properties(width=800)
+unit_labels = unit_bar_chart.mark_text(align="center", baseline="middle", dx=60).encode(
+    text=alt.Text("Unit cost (£/kWh):Q", format=".2f"),
+    color=alt.value("white"),
+)
+unit_cost_chart = alt.layer(unit_bar_chart, unit_labels)
+unit_cost_chart = unit_cost_chart.configure_axis(
+    labelColor="black", titleColor="black"
+).configure_legend(labelColor="black", titleColor="black")
+st.altair_chart(unit_cost_chart)
+
+# Print ratio chart
+bar_chart = (
+    alt.Chart(ratio_data)
+    .mark_bar(color="#0f294a")
+    .encode(y="Scenario:N", x="Electricity to gas unit cost ratio:Q")
+    .properties(width=800)
+)
+bar_labels = bar_chart.mark_text(align="left", baseline="middle", dx=3).encode(
+    text=alt.Text("Electricity to gas unit cost ratio:Q", format=".2f")
+)
+ratio_chart = alt.layer(bar_chart, bar_labels)
+ratio_chart = ratio_chart.configure_axis(labelColor="black", titleColor="black")
+st.altair_chart(ratio_chart)
+
+# Present distributional impacts results
+st.subheader("**Rebalanced scenario: Distributional impacts on energy bills**")
+
 # Plot summary chart
 baseline_totals = scenario_outputs.loc[
     (scenario_outputs["scenario"] == "Baseline")
@@ -500,78 +577,59 @@ chart_data = pd.concat(
 )
 
 chart = alt.Chart(chart_data)
+
+cmap_2 = {
+    "Electricity": "#0000ff",
+    "Electricity/Other": "#fdb633",
+    "Gas": "#18a48c",
+    "Other": "#f6a4b7",
+}
 points = chart.mark_point(opacity=1, filled=True).encode(
     x=alt.X(
         "Bill change:Q",
         axis=alt.Axis(grid=True),
         title="Bill change from current baseline (£)",
+        scale=alt.Scale(domain=[-400, 200]),
     ),
     y=alt.Y(
         "Energy consumer archetype:N",
         axis=alt.Axis(grid=True, labelLimit=500),
         sort=None,
-        title="Energy consumer archetype",
+        title="Energy consumer archetype (low to high income)",
     ),
     size="ArchetypeSize:Q",
-    color="ArchetypeHeatingFuel:N",
+    color=alt.Color(
+        "ArchetypeHeatingFuel:N",
+        scale=alt.Scale(domain=list(cmap_2.keys()), range=list(cmap_2.values())),
+    ),
 )
 rule = chart.mark_rule(strokeDash=[2, 2]).encode(x=alt.datum(0))
-chart = points + rule.properties(width=800)
-
-# Calculate electricity to gas unit cost and ratios
-unit_costs = [
-    elec_bills.get("baseline").calculate_variable_consumption(1),
-    gas_bills.get("baseline").calculate_variable_consumption(1),
-    elec_bills.get(scenario_name).calculate_variable_consumption(1),
-    gas_bills.get(scenario_name).calculate_variable_consumption(1),
-]
-unit_costs = [unit_cost / 1000 for unit_cost in unit_costs]
-scenarios = ["Baseline", "Baseline", scenario_name, scenario_name]
-fuel = ["Electricity", "Gas", "Electricity", "Gas"]
-
-unit_cost_data = pd.DataFrame(
-    {"Scenario": scenarios, "Fuel": fuel, "Unit cost (£/kWh)": unit_costs}
-)
-
-ratios = [
-    elec_bills.get("baseline").calculate_variable_consumption(1)
-    / gas_bills.get("baseline").calculate_variable_consumption(1),
-    elec_bills.get(scenario_name).calculate_variable_consumption(1)
-    / gas_bills.get(scenario_name).calculate_variable_consumption(1),
-]
-ratio_scenarios = ["Baseline", scenario_name]
-ratio_data = pd.DataFrame(
-    {"Scenario": ratio_scenarios, "Electricity to gas unit cost ratio": ratios}
-)
-
-# Print unit cost summary chart
-st.subheader("Rebalanced scenario: Electricity and gas unit costs")
-unit_cost_chart = (
-    alt.Chart(unit_cost_data)
-    .mark_bar()
-    .encode(y="Scenario:N", x="Unit cost (£/kWh):Q", color="Fuel")
-).properties(width=800)
-st.altair_chart(unit_cost_chart)
-
-# Print ratio chart
-ratio_chart = (
-    alt.Chart(ratio_data)
-    .mark_bar()
-    .encode(y="Scenario:N", x="Electricity to gas unit cost ratio:Q")
-    .properties(width=800)
-)
-st.altair_chart(ratio_chart)
-
+summary_chart = alt.layer(points, rule).properties(width=800)
+summary_chart = summary_chart.configure_axis(
+    labelColor="black", titleColor="black"
+).configure_legend(labelColor="black", titleColor="black")
 
 # Print distributional effects summary chart
-st.subheader("**Rebalanced scenario: Distributional effects on energy bills**")
-st.altair_chart(chart)
+st.altair_chart(summary_chart)
 
-# Print distributional effects summary dataframe for download
-# st.markdown(
-#     "*Hover over the table below to download using the 'Download as CSV' button.*"
-# )
-# st.write(summary_data)
+# Option to view results table
+if st.button("View distributional impacts results table"):
+    # Show link to distributional effects summary dataframe for download
+    @st.cache_data
+    def convert_df(df):
+        return df.to_csv(index=False).encode("utf-8")
+
+    csv = convert_df(summary_data)
+
+    st.download_button(
+        "Download table",
+        csv,
+        "rebalanced_scenario_distributional_effect.csv",
+        "text/csv",
+        key="download-csv",
+    )
+
+    st.write(summary_data)
 
 ### TO REFACTOR
 # Create revenue stream overview dataframe
@@ -613,12 +671,12 @@ cost_to_tax = [0] + [
 
 revenue_streams_data = {
     "Scenario": scenarios,
-    "Total cost levied on electricity": cost_to_elec,
-    "Total cost levied on gas": cost_to_gas,
-    "Total cost to general taxation": cost_to_tax,
+    "Total amount levied on electricity": cost_to_elec,
+    "Total amount levied on gas": cost_to_gas,
+    "Total amount removed to general taxation": cost_to_tax,
 }
 revenue_streams_df = pd.DataFrame(revenue_streams_data)
 
 # Print revenue streams summary dataframe
-st.subheader("Rebalanced scenario: Total revenue streams")
+st.subheader("Rebalanced scenario: Total revenue streams (£)")
 st.write(revenue_streams_df)
