@@ -189,15 +189,25 @@ st.markdown(
 
 scenario_name = "Rebalanced"
 
-# Initialise session state for selections
-if "preset" not in st.session_state:
-    st.session_state.preset = "Status quo"
-if "mode" not in st.session_state:
-    st.session_state.mode = {
-        levy.short_name: "Rebalance between electricity and gas" for levy in levies
-    }
-if "tariff_payment_method" not in st.session_state:
-    st.session_state.tariff_payment_method = "Other payment method"
+# Instantiate a state key to hold preset weights
+if "levy_elec_shares" not in st.session_state.keys():
+    st.session_state["levy_elec_shares"], _, _ = get_preset_weights(
+        "Status quo",
+        denominator_values["customers_elec"],
+        denominator_values["customers_gas"],
+    )
+if "levy_gas_shares" not in st.session_state.keys():
+    _, st.session_state["levy_gas_shares"], _ = get_preset_weights(
+        "Status quo",
+        denominator_values["customers_elec"],
+        denominator_values["customers_gas"],
+    )
+if "levy_fixed_shares" not in st.session_state.keys():
+    _, _, st.session_state["levy_fixed_shares"] = get_preset_weights(
+        "Status quo",
+        denominator_values["customers_elec"],
+        denominator_values["customers_gas"],
+    )
 
 # Show selectors for rebalancing scenario in sidebar
 with st.sidebar:
@@ -207,6 +217,16 @@ with st.sidebar:
 
     # User input: Preset or custom weights
     st.subheader("1. Choose rebalancing or removal for each levy")
+
+    def update_weights_for_selection(customers_elec, customers_gas):
+        (
+            st.session_state["levy_elec_shares"],
+            st.session_state["levy_gas_shares"],
+            st.session_state["levy_fixed_shares"],
+        ) = get_preset_weights(
+            st.session_state["preset"], customers_elec, customers_gas
+        )
+
     preset_options = [
         "Status quo",
         "All gas, status quo fixed or variable",
@@ -214,20 +234,22 @@ with st.sidebar:
         "Status quo gas and electricity, all fixed",
         "Status quo gas and electricity, all variable",
     ]
+
+    # On initialisation this should create a session state
     preset = st.selectbox(
         "Do you want to start with a preset approach?",
         preset_options,
-        index=preset_options.index(st.session_state.preset),
+        index=0,
+        key="preset",
+        on_change=update_weights_for_selection,
+        args=(
+            denominator_values["customers_elec"],
+            denominator_values["customers_gas"],
+        ),
     )
 
-    # Update session state
-    st.session_state.preset = preset
-
-    levy_elec_shares, levy_gas_shares, levy_fixed_shares = get_preset_weights(
-        preset,
-        denominator_values["customers_elec"],
-        denominator_values["customers_gas"],
-    )
+    st.session_state["preset"]
+    st.session_state["levy_elec_shares"]
 
     st.markdown(
         "*For each policy cost scheme, you have the option to (a) rebalance between electricity and gas, then rebalance between fixed (standing charge) and variable (unit cost) charging, or (b) remove policy cost off of energy bills.*"
@@ -243,30 +265,27 @@ with st.sidebar:
     new_tax_weights = {}
 
     # User inputs: Rebalancing weights for each levy
-    mode = {levy.short_name: "Rebalance between electricity and gas" for levy in levies}
     for levy in levies:
         st.markdown(f"**{levy.name}**")
 
-        mode[levy.short_name] = st.radio(
+        mode = st.radio(
             f"Rebalance or remove {levy.short_name.upper()}",
             [
                 "Rebalance between electricity and gas",
                 "Remove off bills to general taxation",
             ],
-            index=[
-                "Rebalance between electricity and gas",
-                "Remove off bills to general taxation",
-            ].index(st.session_state.mode[levy.short_name]),
+            index=0,
+            key=f"{levy.short_name}_radio",
         )
 
-        # Update session state
-        st.session_state.mode[levy.short_name] = mode[levy.short_name]
-
-        if mode[levy.short_name] == "Rebalance between electricity and gas":
+        if (
+            st.session_state[f"{levy.short_name}_radio"]
+            == "Rebalance between electricity and gas"
+        ):
             new_tax_weights[levy.short_name] = 0
             new_gas_weights[levy.short_name] = st.slider(
                 f"{levy.short_name.upper()}: electricity (0) <-> gas (100)",
-                value=levy_gas_shares.get(levy.short_name),
+                value=st.session_state["levy_gas_shares"].get(levy.short_name),
             )
             new_electricity_weights[levy.short_name] = (
                 100 - new_gas_weights[levy.short_name]
@@ -289,7 +308,7 @@ with st.sidebar:
         if new_electricity_weights[levy.short_name] > 0:
             new_fixed_electricity_weights[levy.short_name] = st.slider(
                 f"{levy.short_name.upper()} electricity: variable (0) <-> fixed (100)",
-                value=levy_fixed_shares.get(levy.short_name),
+                value=st.session_state["levy_fixed_shares"].get(levy.short_name),
             )
             new_variable_electricity_weights[levy.short_name] = (
                 100 - new_fixed_electricity_weights[levy.short_name]
@@ -302,7 +321,7 @@ with st.sidebar:
         if new_gas_weights[levy.short_name] > 0:
             new_fixed_gas_weights[levy.short_name] = st.slider(
                 f"{levy.short_name.upper()} gas: variable (0) <-> fixed (100)",
-                value=levy_fixed_shares.get(levy.short_name),
+                value=st.session_state["levy_fixed_shares"].get(levy.short_name),
             )
             new_variable_gas_weights[levy.short_name] = (
                 100 - new_fixed_gas_weights[levy.short_name]
@@ -316,20 +335,37 @@ with st.sidebar:
     tariff_payment_method = st.selectbox(
         "Payment method:",
         ["Prepayment meter", "Standard Credit", "Other payment method"],
-        index=["Prepayment meter", "Standard Credit", "Other payment method"].index(
-            st.session_state.tariff_payment_method
-        ),
+        index=1,
+        key="tariff_payment_method",
     )
-    # Update session state
-    st.session_state.tariff_payment_method = tariff_payment_method
 
     # Reset button
     def reset_selection():
-        st.session_state.preset = "Status quo"
-        st.session_state.mode = {
-            levy.short_name: "Rebalance between electricity and gas" for levy in levies
-        }
-        st.session_state.tariff_payment_method = "Other payment method"
+        # Delete the session states for the widgets
+        # This should force them to re-initialise
+        st.session_state["preset"] = "Status quo"
+        st.session_state["ro_radio"] = "Rebalance between electricity and gas"
+        st.session_state["aahedc_radio"] = "Rebalance between electricity and gas"
+        st.session_state["ggl_radio"] = "Rebalance between electricity and gas"
+        st.session_state["whd_radio"] = "Rebalance between electricity and gas"
+        st.session_state["eco_radio"] = "Rebalance between electricity and gas"
+        st.session_state["fit_radio"] = "Rebalance between electricity and gas"
+        st.session_state["tariff_payment_method"] = "Standard Credit"
+        st.session_state["levy_elec_shares"], _, _ = get_preset_weights(
+            "Status quo",
+            denominator_values["customers_elec"],
+            denominator_values["customers_gas"],
+        )
+        _, st.session_state["levy_gas_shares"], _ = get_preset_weights(
+            "Status quo",
+            denominator_values["customers_elec"],
+            denominator_values["customers_gas"],
+        )
+        _, _, st.session_state["levy_fixed_shares"] = get_preset_weights(
+            "Status quo",
+            denominator_values["customers_elec"],
+            denominator_values["customers_gas"],
+        )
 
     st.button("Reset settings", on_click=reset_selection)
 
