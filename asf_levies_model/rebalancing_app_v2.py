@@ -184,7 +184,7 @@ with row1_2:
         "**What is this tool?** As part of Nesta's project on [making energy cheaper by rebalancing levies](https://www.nesta.org.uk/project/finding-ways-to-deliver-cheaper-electricity-by-rebalancing-levies/), this tool allows you to model different approaches to rebalancing policy costs between electricity and gas levies, or removing them off bills to general taxation."
     )
 st.markdown(
-    "Results below show the effects of your rebalancing approach on the [**electricity to gas unit cost ratio**](https://www.nesta.org.uk/blog/the-electricity-to-gas-price-ratio-explained-how-a-green-ratio-would-make-bills-cheaper-and-greener/) and the energy bills of different [**UK energy consumer archetypes**](https://www.cse.org.uk/research-consultancy/consultancy-projects/consumer-archetypes-for-ofgem/)."
+    "Results below show the effects of your rebalancing approach on the [**electricity to gas unit cost ratio**](https://www.nesta.org.uk/blog/the-electricity-to-gas-price-ratio-explained-how-a-green-ratio-would-make-bills-cheaper-and-greener/) and the energy bills of different [**UK energy consumer archetypes**](https://www.ofgem.gov.uk/sites/default/files/2024-02/Ofgem_archetypes_update_2024_FinalReport_v4.1.3.pdf)."
 )
 
 scenario_name = "Rebalanced"
@@ -378,7 +378,7 @@ with st.sidebar:
                 "levy_fixed_shares"
             ].get(levy.short_name)
 
-    st.button("Reset settings", on_click=reset_selection)
+    st.button("**Reset all settings**", on_click=reset_selection)
 
 # Create dictionary of rebalancing scenario weights
 weights = {
@@ -512,28 +512,44 @@ ratio_data = pd.DataFrame(
 st.subheader("Rebalanced scenario: Electricity and gas unit costs")
 
 cmap_1 = {"Electricity": "#18a48c", "Gas": "#0000ff"}
-unit_cost_chart = (
+
+# Stacked bar chart option
+# unit_cost_chart = (
+#     alt.Chart(unit_cost_data)
+#     .mark_bar()
+#     .encode(
+#         y="Scenario:N",
+#         x="Unit cost (£/kWh):Q",
+#         color=alt.Color(
+#             "Fuel",
+#             scale=alt.Scale(domain=list(cmap_1.keys()), range=list(cmap_1.values())),
+#         ),
+#     )
+# ).properties(width=800)
+
+# Grouped bar chart option
+unit_base_chart = (
     alt.Chart(unit_cost_data)
     .mark_bar()
     .encode(
-        y="Scenario:N",
         x="Unit cost (£/kWh):Q",
+        y="Scenario:N",
         color=alt.Color(
             "Fuel",
             scale=alt.Scale(domain=list(cmap_1.keys()), range=list(cmap_1.values())),
         ),
     )
-).properties(width=800)
-
-# Weird things are happening with the alignment of labels - to fix in the future
-# unit_labels = unit_bar_chart.mark_text(align="center", baseline="middle", dx=30).encode(
-#     x=alt.X("Fuel:N", title=None, axis=None),
-#     y="Scenario:N",
-#     text=alt.Text("Unit cost (£/kWh):Q", format=".2f"),
-#     color=alt.value("white"),
-# )
-# unit_cost_chart = alt.layer(unit_bar_chart, unit_labels)
-
+    .properties(width=800)
+)
+unit_labels = unit_base_chart.mark_text(
+    align="center", baseline="middle", dx=15
+).encode(
+    text=alt.Text("Unit cost (£/kWh):Q", format=".2f"),
+    color=alt.value("black"),
+)
+unit_cost_chart = (unit_base_chart + unit_labels).facet(
+    row=alt.Row("Fuel:N", title=None, header=alt.Header(labels=False))
+)
 unit_cost_chart = unit_cost_chart.configure_axis(
     labelColor="black", titleColor="black"
 ).configure_legend(labelColor="black", titleColor="black")
@@ -620,9 +636,9 @@ summary_chart = summary_chart.configure_axis(
 
 # Print distributional effects summary chart
 st.altair_chart(summary_chart)
-st.markdown(
-    "*Note: The archetype size for the Typical archetype is arbitrarily set at 1,000,000 households as a placeholder.*"
-)
+# st.markdown(
+#     "*Note: The archetype size for the Typical archetype is arbitrarily set at 1,000,000 households as a placeholder.*"
+# )
 
 # Option to view results table
 if st.button("View distributional impacts results table"):
@@ -681,14 +697,28 @@ cost_to_tax = [0] + [
     for scenario in weights.keys()
 ]
 
+divisor = 1_000_000_000
+dp = 2
 revenue_streams_data = {
     "Scenario": scenarios,
-    "Total amount levied on electricity": cost_to_elec,
-    "Total amount levied on gas": cost_to_gas,
-    "Total amount removed to general taxation": cost_to_tax,
+    "Total amount levied on electricity (£ billion)": [
+        round(x / divisor, 2) for x in cost_to_elec
+    ],
+    "Total amount levied on gas (£ billion)": [
+        round(x / divisor, 2) for x in cost_to_gas
+    ],
+    "Total amount removed to general taxation (£ billion)": [
+        round(x / divisor, 2) for x in cost_to_tax
+    ],
 }
 revenue_streams_df = pd.DataFrame(revenue_streams_data)
 
 # Print revenue streams summary dataframe
-st.subheader("Rebalanced scenario: Total revenue streams (£)")
+st.subheader("Rebalanced scenario: Total cost to energy bills and general taxation")
 st.write(revenue_streams_df)
+
+cost_to_taxpayers = round(revenue_streams_df.iloc[1, 3], 2)
+st.markdown(
+    f"<p style='color:red;'>Additional annual cost to taxpayers: <b>£{cost_to_taxpayers} billion</b></p>",
+    unsafe_allow_html=True,
+)
