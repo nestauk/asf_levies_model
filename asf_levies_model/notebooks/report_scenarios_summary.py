@@ -1,21 +1,3 @@
-# -*- coding: utf-8 -*-
-# ---
-# jupyter:
-#   jupytext:
-#     cell_metadata_filter: -all
-#     comment_magics: true
-#     custom_cell_magics: kql
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.2
-#   kernelspec:
-#     display_name: asf_levies_model
-#     language: python
-#     name: python3
-# ---
-
 # %%
 import pandas as pd
 from datetime import datetime
@@ -836,4 +818,7 @@ with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
     cost_ratio_frame.to_excel(writer, sheet_name="Scenario cost ratios", index=False)
     scenarios_revenue_streams.to_excel(
         writer, sheet_name="Scenario revenue streams", index=False
+    )
+    ofgem_archetypes_df.to_excel(
+        writer, sheet_name="Underlying headline data", index=False
     )
