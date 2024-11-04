@@ -19,6 +19,7 @@
 import pandas as pd
 
 from asf_levies_model.getters.load_data import ofgem_archetypes_data
+import matplotlib.pyplot as plt
 
 # %% [markdown]
 # Load consumption data and transform
