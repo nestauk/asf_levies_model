@@ -1160,10 +1160,22 @@ ObligatedSupplierVolumeElectricity, fields.
 
         if not revenue:
             revenue = (
-                latest.AnnualisedCostECO4Gas
-                + latest.AnnualisedCostECO4Electricity
-                + latest.AnnualisedCostGBISGas
-                + latest.AnnualisedCostGBISElectricity
+                (
+                    latest.AnnualisedCostECO4Gas
+                    * (1 + latest.GDPDeflatorToCurrentPricesECO4 / 100)
+                )
+                + (
+                    latest.AnnualisedCostECO4Electricity
+                    * (1 + latest.GDPDeflatorToCurrentPricesECO4 / 100)
+                )
+                + (
+                    latest.AnnualisedCostGBISGas
+                    * (1 + latest.GDPDeflatorToCurrentPricesGBIS / 100)
+                )
+                + (
+                    latest.AnnualisedCostGBISElectricity
+                    * (1 + latest.GDPDeflatorToCurrentPricesGBIS / 100)
+                )
             )
 
         return cls(
