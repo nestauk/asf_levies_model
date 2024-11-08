@@ -320,6 +320,14 @@ scenarios_summary_chart["Bill change from baseline"] = scenarios_summary_chart.a
 
 scenarios_summary_chart = scenarios_summary_chart.reset_index(drop=True)
 
+# %%
+# Remove Typical profile
+scenarios_summary_chart = scenarios_summary_chart[
+    ~scenarios_summary_chart["AnnualConsumptionProfile"].str.contains(
+        "Typical", na=False
+    )
+]
+
 # %% [markdown]
 # **Alternative scenario with modified WHD levy object (double revenue)**
 
@@ -330,7 +338,11 @@ double_whd_levies = [
     RO.from_dataframe(process_data_RO(fileobject), denominator=94_200_366),
     AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=94_200_366),
     GGL.from_dataframe(process_data_GGL(fileobject), denominator=24_503_683),
-    WHD.from_dataframe(process_data_WHD(fileobject)),
+    WHD.from_dataframe(
+        process_data_WHD(fileobject),
+        customers_gas=denominator_values["customers_gas"],
+        customers_elec=denominator_values["customers_elec"],
+    ),
     ECO.from_dataframe(process_data_ECO(fileobject)),
     FIT.from_dataframe(process_data_FIT(fileobject), revenue=689_233_317),
 ]
@@ -350,15 +362,6 @@ for levy in double_whd_levies:
         "new_fixed_weight_gas": levy.gas_fixed_weight,
     }
 
-# manually update WHD weights according to denominator balance
-status_quo["whd"]["new_electricity_weight"] = denominators["whd"]["customers_elec"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
-)
-
-status_quo["whd"]["new_gas_weight"] = denominators["whd"]["customers_gas"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
-)
-
 # rebalance baseline levies
 double_whd_levies = [
     levy.rebalance_levy(
@@ -369,11 +372,13 @@ double_whd_levies = [
 
 # %%
 # Double WHD revenue
-double_whd_levies[3].revenue = double_whd_levies[3].revenue * 2
+# double_whd_levies[3].revenue = double_whd_levies[3].revenue * 2
 
-# double_whd_levies[3] = double_whd_levies[3].update_revenue(
-#    new_revenue=double_whd_levies[3].revenue * 2,
-#    **denominators[double_whd_levies[3].short_name])
+# The update revenue method automatically updates the levy rates for the levy given the revised revenue amount.
+double_whd_levies[3] = double_whd_levies[3].update_revenue(
+    new_revenue=double_whd_levies[3].revenue * 2,
+    **denominators[double_whd_levies[3].short_name],
+)
 
 
 # %%
@@ -541,19 +546,24 @@ alternative_scenarios_summary_chart["WHD Eligibility"] = "Ineligible"
 
 # Add column for number of eligible households
 eligibility_size = ofgem_archetypes_scheme_eligibility()
-whd_eligibility_size = eligibility_size[
-    ["AnnualConsumptionProfile", "WHDEligibleSize"]
-].set_index("AnnualConsumptionProfile")
-alternative_scenarios_summary_chart["WHD Eligibility Size"] = (
-    alternative_scenarios_summary_chart.apply(
-        lambda row: (
-            whd_eligibility_size.loc[row["AnnualConsumptionProfile"], "WHDEligibleSize"]
-            if row["AnnualConsumptionProfile"] in whd_eligibility_size.index
-            else 0
-        ),
-        axis=1,
-    )
+whd_eligibility_size = (
+    eligibility_size[["AnnualConsumptionProfile", "WHDEligibleSize"]]
+    .set_index("AnnualConsumptionProfile")
+    .astype("Int64")
 )
+
+# Perform merge to bring in whd eligibility
+alternative_scenarios_summary_chart = (
+    alternative_scenarios_summary_chart.merge(
+        whd_eligibility_size,
+        how="left",
+        left_on="AnnualConsumptionProfile",
+        right_index=True,
+    )
+    .fillna({"WHDEligibleSize": 0})
+    .rename(columns={"WHDEligibleSize": "WHD Eligibility Size"})
+)
+
 # Add column for number of ineligible households
 alternative_scenarios_summary_chart["WHD Ineligibility Size"] = (
     alternative_scenarios_summary_chart["ArchetypeSize"]
@@ -561,18 +571,15 @@ alternative_scenarios_summary_chart["WHD Ineligibility Size"] = (
 )
 
 # %%
+alternative_scenarios_summary_chart[
+    lambda df: (~df["AnnualConsumptionProfile"].str.contains("_"))
+    & (df["scenario"].str.contains("1|7"))
+]
+
+# %%
 # Create a new dataframe for eligible households to append
 eligible_alternative_scenarios_summary_chart = alternative_scenarios_summary_chart.copy(
     deep=True
-)
-
-# Drop Baseline scenario rows
-eligible_alternative_scenarios_summary_chart = (
-    eligible_alternative_scenarios_summary_chart[
-        ~eligible_alternative_scenarios_summary_chart["scenario"].str.contains(
-            "1. Baseline", na=False
-        )
-    ]
 )
 
 # Re-classify as eligible
@@ -582,19 +589,24 @@ eligible_alternative_scenarios_summary_chart["WHD Eligibility"] = (
     )
 )
 
-# Apply £150 + £150 rebate to eligible households
+# Adjust all eligible household bills to reflect £150 discount
 eligible_alternative_scenarios_summary_chart["total bill incl VAT"] = (
-    eligible_alternative_scenarios_summary_chart["total bill incl VAT"] - 300
+    eligible_alternative_scenarios_summary_chart["total bill incl VAT"] - 150
+)
+
+# Apply additional £150 rebate to eligible households for double WHD scenarios
+# Filter out BAseline to update all others.
+eligible_alternative_scenarios_summary_chart.loc[
+    lambda df: df["scenario"] != "1. Baseline", "total bill incl VAT"
+] = (
+    eligible_alternative_scenarios_summary_chart.loc[
+        lambda df: df["scenario"] != "1. Baseline", "total bill incl VAT"
+    ]
+    - 150
 )
 
 # %%
-# Append eligible household rows to original dataframe
-alternative_scenarios_summary_chart = pd.concat(
-    [alternative_scenarios_summary_chart, eligible_alternative_scenarios_summary_chart]
-)
-
-# %%
-# Create new column for bill change from baseline
+# Create new column for bill change from baseline - ineligible households
 baseline = alternative_scenarios_summary_chart[
     alternative_scenarios_summary_chart["scenario"] == "1. Baseline"
 ].set_index("AnnualConsumptionProfile")["total bill incl VAT"]
@@ -607,24 +619,32 @@ alternative_scenarios_summary_chart["Bill change from baseline"] = (
     )
 )
 
-# %% [markdown]
-# **Combine all scenario results**
+# Create new column for bill change from baseline - eligible households
+baseline_eligible = eligible_alternative_scenarios_summary_chart[
+    eligible_alternative_scenarios_summary_chart["scenario"] == "1. Baseline"
+].set_index("AnnualConsumptionProfile")["total bill incl VAT"]
+
+eligible_alternative_scenarios_summary_chart["Bill change from baseline"] = (
+    eligible_alternative_scenarios_summary_chart.apply(
+        lambda row: row["total bill incl VAT"]
+        - baseline_eligible.get(row["AnnualConsumptionProfile"], 0),
+        axis=1,
+    )
+)
 
 # %%
-all_scenarios_summary_chart = pd.concat(
-    [scenarios_summary_chart, alternative_scenarios_summary_chart]
+# Append eligible household rows to ineligible households dataframe
+double_whd_scenarios_summary_chart = pd.concat(
+    [alternative_scenarios_summary_chart, eligible_alternative_scenarios_summary_chart]
 )
+
+# %%
 # Remove Typical profile
-all_scenarios_summary_chart = all_scenarios_summary_chart[
-    ~all_scenarios_summary_chart["AnnualConsumptionProfile"].str.contains(
+double_whd_scenarios_summary_chart = double_whd_scenarios_summary_chart[
+    ~double_whd_scenarios_summary_chart["AnnualConsumptionProfile"].str.contains(
         "Typical", na=False
     )
 ]
-# Remove duplicate Baseline scenario rows
-mask = (all_scenarios_summary_chart["scenario"] == "1. Baseline") & (
-    all_scenarios_summary_chart["WHD Eligibility"] == "Ineligible"
-)
-all_scenarios_summary_chart = all_scenarios_summary_chart[~mask]
 
 # %% [markdown]
 # **Electricity to gas unit cost ratios**
@@ -812,8 +832,11 @@ filename = f"{PROJECT_DIR}/outputs/data/scenarios_data_{date_str}.xlsx"
 # Create an Excel writer object
 with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
     # Write each DataFrame to a different sheet
-    all_scenarios_summary_chart.to_excel(
-        writer, sheet_name="All scenarios summary", index=False
+    scenarios_summary_chart.to_excel(
+        writer, sheet_name="Scenarios 1 to 5 summary", index=False
+    )
+    double_whd_scenarios_summary_chart.to_excel(
+        writer, sheet_name="Scenarios 6 and 7 summary", index=False
     )
     cost_ratio_frame.to_excel(writer, sheet_name="Scenario cost ratios", index=False)
     scenarios_revenue_streams.to_excel(
