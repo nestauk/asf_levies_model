@@ -338,7 +338,11 @@ double_whd_levies = [
     RO.from_dataframe(process_data_RO(fileobject), denominator=94_200_366),
     AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=94_200_366),
     GGL.from_dataframe(process_data_GGL(fileobject), denominator=24_503_683),
-    WHD.from_dataframe(process_data_WHD(fileobject)),
+    WHD.from_dataframe(
+        process_data_WHD(fileobject),
+        customers_gas=denominator_values["customers_gas"],
+        customers_elec=denominator_values["customers_elec"],
+    ),
     ECO.from_dataframe(process_data_ECO(fileobject)),
     FIT.from_dataframe(process_data_FIT(fileobject), revenue=689_233_317),
 ]
@@ -358,15 +362,6 @@ for levy in double_whd_levies:
         "new_fixed_weight_gas": levy.gas_fixed_weight,
     }
 
-# manually update WHD weights according to denominator balance
-status_quo["whd"]["new_electricity_weight"] = denominators["whd"]["customers_elec"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
-)
-
-status_quo["whd"]["new_gas_weight"] = denominators["whd"]["customers_gas"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
-)
-
 # rebalance baseline levies
 double_whd_levies = [
     levy.rebalance_levy(
@@ -377,11 +372,13 @@ double_whd_levies = [
 
 # %%
 # Double WHD revenue
-double_whd_levies[3].revenue = double_whd_levies[3].revenue * 2
+# double_whd_levies[3].revenue = double_whd_levies[3].revenue * 2
 
-# double_whd_levies[3] = double_whd_levies[3].update_revenue(
-#    new_revenue=double_whd_levies[3].revenue * 2,
-#    **denominators[double_whd_levies[3].short_name])
+# The update revenue method automatically updates the levy rates for the levy given the revised revenue amount.
+double_whd_levies[3] = double_whd_levies[3].update_revenue(
+    new_revenue=double_whd_levies[3].revenue * 2,
+    **denominators[double_whd_levies[3].short_name],
+)
 
 
 # %%
@@ -549,24 +546,35 @@ alternative_scenarios_summary_chart["WHD Eligibility"] = "Ineligible"
 
 # Add column for number of eligible households
 eligibility_size = ofgem_archetypes_scheme_eligibility()
-whd_eligibility_size = eligibility_size[
-    ["AnnualConsumptionProfile", "WHDEligibleSize"]
-].set_index("AnnualConsumptionProfile")
-alternative_scenarios_summary_chart["WHD Eligibility Size"] = (
-    alternative_scenarios_summary_chart.apply(
-        lambda row: (
-            whd_eligibility_size.loc[row["AnnualConsumptionProfile"], "WHDEligibleSize"]
-            if row["AnnualConsumptionProfile"] in whd_eligibility_size.index
-            else 0
-        ),
-        axis=1,
-    )
+whd_eligibility_size = (
+    eligibility_size[["AnnualConsumptionProfile", "WHDEligibleSize"]]
+    .set_index("AnnualConsumptionProfile")
+    .astype("Int64")
 )
+
+# Perform merge to bring in whd eligibility
+alternative_scenarios_summary_chart = (
+    alternative_scenarios_summary_chart.merge(
+        whd_eligibility_size,
+        how="left",
+        left_on="AnnualConsumptionProfile",
+        right_index=True,
+    )
+    .fillna({"WHDEligibleSize": 0})
+    .rename(columns={"WHDEligibleSize": "WHD Eligibility Size"})
+)
+
 # Add column for number of ineligible households
 alternative_scenarios_summary_chart["WHD Ineligibility Size"] = (
     alternative_scenarios_summary_chart["ArchetypeSize"]
     - alternative_scenarios_summary_chart["WHD Eligibility Size"]
 )
+
+# %%
+alternative_scenarios_summary_chart[
+    lambda df: (~df["AnnualConsumptionProfile"].str.contains("_"))
+    & (df["scenario"].str.contains("1|7"))
+]
 
 # %%
 # Create a new dataframe for eligible households to append
@@ -587,15 +595,14 @@ eligible_alternative_scenarios_summary_chart["total bill incl VAT"] = (
 )
 
 # Apply additional £150 rebate to eligible households for double WHD scenarios
-eligible_alternative_scenarios_summary_chart["total bill incl VAT"] = (
-    eligible_alternative_scenarios_summary_chart.apply(
-        lambda x: (
-            x["total bill incl VAT"] - 150
-            if x["scenario"] != "1. Baseline"
-            else x["total bill incl VAT"]
-        ),
-        axis=1,
-    )
+# Filter out BAseline to update all others.
+eligible_alternative_scenarios_summary_chart.loc[
+    lambda df: df["scenario"] != "1. Baseline", "total bill incl VAT"
+] = (
+    eligible_alternative_scenarios_summary_chart.loc[
+        lambda df: df["scenario"] != "1. Baseline", "total bill incl VAT"
+    ]
+    - 150
 )
 
 # %%
