@@ -102,7 +102,7 @@ def get_preset_weights(preset_name, customers_elec, customers_gas):
 
 
 def get_bills(tariff_payment_method, scenario_name, elec_data, gas_data):
-    if tariff_payment_method == "Other payment method":
+    if tariff_payment_method == "Other payment method (Direct debit)":
         elec_class = ElectricityOtherPayment
         gas_class = GasOtherPayment
         elec_nil, elec_typical = elec_data["other_payment"]

@@ -305,7 +305,7 @@ with st.sidebar:
         # User input: Electricity, fixed vs variable
         if new_electricity_weights[levy.short_name] > 0:
             new_fixed_electricity_weights[levy.short_name] = st.slider(
-                f"{levy.short_name.upper()} electricity: variable (0) <-> fixed (100)",
+                f"{levy.short_name.upper()} electricity: unit cost (0) <-> standing charge (100)",
                 value=st.session_state["levy_fixed_shares"].get(levy.short_name),
                 key=f"{levy.short_name}_electricity_fixed_shares",
             )
@@ -319,7 +319,7 @@ with st.sidebar:
         # User input: Gas, fixed vs variable
         if new_gas_weights[levy.short_name] > 0:
             new_fixed_gas_weights[levy.short_name] = st.slider(
-                f"{levy.short_name.upper()} gas: variable (0) <-> fixed (100)",
+                f"{levy.short_name.upper()} gas: unit cost (0) <-> standing charge (100)",
                 value=st.session_state["levy_fixed_shares"].get(levy.short_name),
                 key=f"{levy.short_name}_gas_fixed_shares",
             )
@@ -334,7 +334,7 @@ with st.sidebar:
     st.subheader("2. Choose payment method")
     tariff_payment_method = st.selectbox(
         "Payment method:",
-        ["Prepayment meter", "Standard Credit", "Other payment method"],
+        ["Prepayment meter", "Standard Credit", "Other payment method (Direct debit)"],
         index=2,
         key="tariff_payment_method",
     )
@@ -350,7 +350,9 @@ with st.sidebar:
                 "Rebalance between electricity and gas"
             )
 
-        st.session_state["tariff_payment_method"] = "Other payment method"
+        st.session_state["tariff_payment_method"] = (
+            "Other payment method (Direct debit)"
+        )
         st.session_state["levy_elec_shares"], _, _ = get_preset_weights(
             "Status quo",
             denominator_values["customers_elec"],
