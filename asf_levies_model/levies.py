@@ -1323,7 +1323,7 @@ class FIT(Levy):
 
     @classmethod
     def from_dataframe(
-        cls, df: pd.DataFrame, revenue: float = None, scaling_factor: float = None
+        cls, df: pd.DataFrame, revenue: float = None, scaling_factor: float = 1.0
     ) -> "FIT":
         """Create FIT levy instance from dataframe input.
 
@@ -1354,12 +1354,10 @@ ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fi
             latest.ExemptSupplyEII,
         )
 
-        if revenue:
-            if scaling_factor:
-                revenue = revenue * scaling_factor
+        if not revenue:
+            revenue = latest.InflatedLevelisationFund * scaling_factor
         else:
-            if scaling_factor:
-                revenue = latest.InflatedLevelisationFund * scaling_factor
+            revenue *= scaling_factor
 
         return cls(
             name="Feed in Tariff",
