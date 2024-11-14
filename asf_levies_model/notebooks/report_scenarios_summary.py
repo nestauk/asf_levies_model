@@ -30,32 +30,6 @@ from asf_levies_model.summary import (
 from asf_levies_model import config, PROJECT_DIR
 
 # %%
-# Annex 4 and initialise levies
-fileobject = download_annex_4(as_fileobject=True)
-levies = [
-    RO.from_dataframe(process_data_RO(fileobject), denominator=94_200_366),
-    AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=94_200_366),
-    GGL.from_dataframe(process_data_GGL(fileobject), denominator=24_503_683),
-    WHD.from_dataframe(process_data_WHD(fileobject)),
-    ECO.from_dataframe(process_data_ECO(fileobject)),
-    FIT.from_dataframe(process_data_FIT(fileobject), revenue=689_233_317),
-]
-fileobject.close()
-
-# %%
-# Annex 9 and initialise tariffs (Other Payment method)
-fileobject = download_annex_9(as_fileobject=True)
-elec_other_payment_nil = process_tariff_elec_other_payment_nil(fileobject)
-elec_other_payment_typical = process_tariff_elec_other_payment_typical(fileobject)
-gas_other_payment_nil = process_tariff_gas_other_payment_nil(fileobject)
-gas_other_payment_typical = process_tariff_gas_other_payment_typical(fileobject)
-fileobject.close()
-
-# %%
-# Load archetypes headline data
-ofgem_archetypes_df = ofgem_archetypes_data()
-
-# %%
 # Set denominator values
 supply_elec = 94_200_366
 supply_gas = 265_197_947
@@ -71,6 +45,42 @@ denominator_values = {
 denominators = {
     key: denominator_values for key in ["ro", "aahedc", "ggl", "whd", "eco", "fit"]
 }
+
+# %%
+# Scaling factor for estimating domestic share of FIT revenue
+total_supply_elec = (
+    250_020_739  # DESNZ GB total electricity consumption - all meters (2022)
+)
+fit_scaling_factor = supply_elec / total_supply_elec
+
+# %%
+# Annex 4 and initialise levies
+fileobject = download_annex_4(as_fileobject=True)
+levies = [
+    RO.from_dataframe(process_data_RO(fileobject), denominator=94_200_366),
+    AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=94_200_366),
+    GGL.from_dataframe(process_data_GGL(fileobject), denominator=24_503_683),
+    WHD.from_dataframe(process_data_WHD(fileobject)),
+    ECO.from_dataframe(process_data_ECO(fileobject)),
+    FIT.from_dataframe(
+        process_data_FIT(fileobject),
+        scaling_factor=fit_scaling_factor,
+    ),
+]
+fileobject.close()
+
+# %%
+# Annex 9 and initialise tariffs (Other Payment method)
+fileobject = download_annex_9(as_fileobject=True)
+elec_other_payment_nil = process_tariff_elec_other_payment_nil(fileobject)
+elec_other_payment_typical = process_tariff_elec_other_payment_typical(fileobject)
+gas_other_payment_nil = process_tariff_gas_other_payment_nil(fileobject)
+gas_other_payment_typical = process_tariff_gas_other_payment_typical(fileobject)
+fileobject.close()
+
+# %%
+# Load archetypes headline data
+ofgem_archetypes_df = ofgem_archetypes_data()
 
 # %%
 # Scenario 1: Status quo - Rebalance baseline to reflect denominators
