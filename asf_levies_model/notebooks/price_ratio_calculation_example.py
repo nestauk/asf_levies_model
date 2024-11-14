@@ -1,3 +1,21 @@
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     comment_magics: true
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: asf_levies_model
+#     language: python
+#     name: python3
+# ---
+
 # %%
 from asf_levies_model.getters.load_data import (
     download_annex_4,
@@ -57,11 +75,58 @@ gas_bill = GasOtherPayment.from_dataframe(
 )
 
 # %% [markdown]
+# **Electricity and gas unit costs refer only to the variable costs.**
+
+# %%
+elec_bill.calculate_variable_consumption(1) / gas_bill.calculate_variable_consumption(1)
+
+# %% [markdown]
+# If policy costs are the only thing we can change, then minimising the ratio means:
+# - Making electricity variable charges as low as possible (this could also mean moving all electricity policy costs to fixed charges)
+# - Making gas variable charges as high as possible
+#
+# This means the lowest ratio achievable is through charging policy costs on gas units.
+
+# %% [markdown]
+# ---
+
+# %% [markdown]
+# Checking domestic denominator values with number of households reported with Ofgem archetypes
+
+# %%
+# Subnational accounts, domestic
+supply_elec = 94_200_366
+supply_gas = 265_197_947
+customers_gas = 24_503_683
+customers_elec = 29_078_770
+
+# %%
+archetype_data = ofgem_archetypes_data()
+
+# %% [markdown]
+# Number of gas households
+
+# %%
+gas_households = archetype_data.loc[
+    archetype_data["GaskWh"] != 0, "ArchetypeSize"
+].sum()
+gas_households, customers_gas
+
+# %%
+elec_households = archetype_data.loc[
+    archetype_data["ElectricitySingleRatekWh"] != 0, "ArchetypeSize"
+].sum()
+elec_households, customers_elec
+
+# %% [markdown]
+# ---
+# *Ignore below (not correct way of calculating electricity:gas price ratio)*
+
+# %% [markdown]
 # With current policy costs (status quo levy rates)
 
 # %%
 archetype_data = ofgem_archetypes_data()
-archetype_data
 
 # %%
 archetype_data["Electricity bill"] = elec_bill.calculate_total_consumption(
