@@ -1322,7 +1322,9 @@ class FIT(Levy):
         self.ExemptSupplyEII = ExemptSupplyEII
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame, revenue: float = None) -> "FIT":
+    def from_dataframe(
+        cls, df: pd.DataFrame, revenue: float = None, scaling_factor: float = None
+    ) -> "FIT":
         """Create FIT levy instance from dataframe input.
 
         Uses the `process_data_FIT()` output from `asf_levies_model.getters.load_data` to \
@@ -1336,6 +1338,7 @@ value can also be provided if a different value is required.
 LookupPeriod, InflatedLevelisationFund, TotalElectricitySupplied, ExemptSupplyOutsideUK, \
 ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fields.
             revenue: float, a total revenue amount (£) for the levy.
+            scaling_factor: float, factor to scale total revenue amount (£) to reflect e.g. only domestic share.
         """
         # get latest fit values from df
         latest = (
@@ -1351,8 +1354,12 @@ ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fi
             latest.ExemptSupplyEII,
         )
 
-        if not revenue:
-            revenue = latest.InflatedLevelisationFund
+        if revenue:
+            if scaling_factor:
+                revenue = revenue * scaling_factor
+        else:
+            if scaling_factor:
+                revenue = latest.InflatedLevelisationFund * scaling_factor
 
         return cls(
             name="Feed in Tariff",
