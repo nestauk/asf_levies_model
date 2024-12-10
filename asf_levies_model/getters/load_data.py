@@ -754,21 +754,49 @@ def _tidy_tariff_table(
     pd.DataFrame
         Dataframing containing tariff component values for one fuel type-payment method in tidy format.
     """
-    # Tidy input data
-    tidy_df = input_df.melt(
-        id_vars=type_of_consumption, var_name="28AD_Charge_Restriction_Period"
+    # Transpose table to put 28ad charging period in the index
+    df = input_df.set_index(type_of_consumption).transpose().reset_index()
+    # Get starting period of the table
+    starting_period = pd.to_datetime(df.loc[0, "index"].split("-")[0])
+    # Get index starting point
+    try:
+        start_index = (
+            index_28AD.map(lambda idx: True if starting_period in idx[1] else False)
+            .to_numpy()
+            .nonzero()[0][0]
+        )
+    except IndexError:
+        raise IndexError("Could not match tariff start date with 28AD index.")
+    # set multi index
+    # Remove Jan 2019 record - this isn't used for tariffs.
+    drop_idx = (
+        index_28AD.map(
+            lambda idx: True if pd.to_datetime("2019-01") in idx[1] else False
+        )
+        .to_numpy()
+        .nonzero()[0][1]
     )
-    # Add start and end dates
-    with warnings.catch_warnings():
-        # Suppress warning for datetime parsing each element individually.
-        # Dates in this table are a mess and this is desired behaviour.
-        warnings.simplefilter("ignore")
-        tidy_df["28AD_Charge_Restriction_Period_start"] = pd.to_datetime(
-            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[0]
+    # Add index to table - dropping unneeded row and limiting to relevant period.
+    df = df.set_index(
+        index_28AD.drop(index_28AD[drop_idx])[start_index : start_index + df.shape[0]]
+    )
+
+    tidy_df = (
+        df.drop(columns="index")
+        .reset_index()
+        .melt(
+            id_vars=[
+                "28AD Charge Restriction Period 6 Month",
+                "28AD Charge Restriction Period 3 Month",
+            ]
         )
-        tidy_df["28AD_Charge_Restriction_Period_end"] = pd.to_datetime(
-            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[1]
+        .set_index(
+            [
+                "28AD Charge Restriction Period 6 Month",
+                "28AD Charge Restriction Period 3 Month",
+            ]
         )
+    )
 
     return tidy_df
 
