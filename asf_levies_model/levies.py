@@ -2,10 +2,10 @@ import copy
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 import warnings
 
-from asf_levies_model.utils.utils import _generate_docstring
+from asf_levies_model.utils.utils import _generate_docstring, PriceCapPeriod
 
 
 class Levy:
@@ -35,6 +35,7 @@ class Levy:
             gas_fixed_rate: float [0, inf) the gas fixed rate for a levy.
             general_taxation: float [0, inf) the levy revenue passed to general taxation.
             revenue: float [0, inf) the total levy revenue.
+            price_cap_period: Interval indicating the price cap period the levy covers.
     """
 
     def __init__(
@@ -54,6 +55,7 @@ class Levy:
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
     ) -> None:
         """Initializes the instance based on provided levy parameters.
 
@@ -73,6 +75,7 @@ class Levy:
             gas_fixed_rate: Rate to calculate gas fixed cost (per customer or meter).
             general_taxation: Revenue abstracted to general taxation (absolute value).
             revenue: Total levy revenue (absolute value).
+            price_cap_period: Energy price cap period covered by the levy instance.
         """
         self.name = name
         self.short_name = short_name
@@ -97,6 +100,9 @@ class Levy:
 
         # revenue
         self.revenue = revenue
+
+        # price cap period
+        self.price_cap_period = price_cap_period
 
     def calculate_levy(
         self,
@@ -433,6 +439,7 @@ class RO(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         obligation_level: float,
@@ -456,6 +463,7 @@ class RO(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -527,6 +535,10 @@ BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fi
             else:
                 df = df.loc[mask].iloc[0]
 
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
         ro_levy = cls.calculate_renewable_obligation_rate(
             df.ObligationLevel,
             df.BuyOutPriceSchemeYear,
@@ -552,6 +564,7 @@ BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fi
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
+            price_cap_period=price_cap_period,
             UpdateDate=df.UpdateDate,
             SchemeYear=df.SchemeYear,
             obligation_level=df.ObligationLevel,
@@ -615,6 +628,7 @@ class AAHEDC(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         TariffCurrentYear: float,
@@ -637,6 +651,7 @@ class AAHEDC(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -715,6 +730,10 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
             df.TariffCurrentYear, aahedc_tariff_forecast
         )
 
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
         if not revenue:
             revenue = aahedc_levy * denominator
 
@@ -734,6 +753,7 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
+            price_cap_period=price_cap_period,
             UpdateDate=df.UpdateDate,
             SchemeYear=df.SchemeYear,
             TariffCurrentYear=df.TariffCurrentYear,
@@ -799,6 +819,7 @@ class GGL(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         LevyRate: float,
@@ -820,6 +841,7 @@ class GGL(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -882,6 +904,10 @@ price cap period of interest.
 
         ggl_levy = cls.calculate_ggl_rate(df.LevyRate, df.BackdatedLevyRate)
 
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
         if not revenue:
             revenue = ggl_levy * denominator
 
@@ -901,6 +927,7 @@ price cap period of interest.
             gas_fixed_rate=ggl_levy,
             general_taxation=0,
             revenue=revenue,
+            price_cap_period=price_cap_period,
             UpdateDate=df.UpdateDate,
             SchemeYear=df.SchemeYear,
             LevyRate=df.LevyRate,
@@ -962,6 +989,7 @@ class WHD(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         TargetSpendingForSchemeYear: float,
@@ -986,6 +1014,7 @@ class WHD(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -1063,6 +1092,10 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
             df.CompulsorySupplierFractionOfCoreGroup,
         )
 
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
         if not revenue:
             revenue = df.TargetSpendingForSchemeYear
 
@@ -1089,6 +1122,7 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
             gas_fixed_rate=whd_levy,
             general_taxation=0,
             revenue=revenue,
+            price_cap_period=price_cap_period,
             UpdateDate=df.UpdateDate,
             SchemeYear=df.SchemeYear,
             TargetSpendingForSchemeYear=df.TargetSpendingForSchemeYear,
@@ -1175,6 +1209,7 @@ class ECO(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         AnnualisedCostECO4Gas: float,
@@ -1204,6 +1239,7 @@ class ECO(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -1291,6 +1327,10 @@ ObligatedSupplierVolumeElectricity, fields.
             df.ObligatedSupplierVolumeElectricity,
         )
 
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
         if not revenue:
             revenue = (
                 (
@@ -1327,6 +1367,7 @@ ObligatedSupplierVolumeElectricity, fields.
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
+            price_cap_period=price_cap_period,
             UpdateDate=df.UpdateDate,
             SchemeYear=df.SchemeYear,
             AnnualisedCostECO4Gas=df.AnnualisedCostECO4Gas,
@@ -1417,6 +1458,7 @@ class FIT(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         LookupPeriod: str,
         InflatedLevelisationFund: float,
         TotalElectricitySupplied: float,
@@ -1439,6 +1481,7 @@ class FIT(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.LookupPeriod = LookupPeriod
         self.InflatedLevelisationFund = InflatedLevelisationFund
@@ -1506,6 +1549,10 @@ ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fi
             df.ExemptSupplyEII,
         )
 
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
         if not revenue:
             revenue = df.InflatedLevelisationFund * scaling_factor
         else:
@@ -1527,6 +1574,7 @@ ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fi
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
+            price_cap_period=price_cap_period,
             LookupPeriod=df.LookupPeriod,
             InflatedLevelisationFund=df.InflatedLevelisationFund,
             TotalElectricitySupplied=df.TotalElectricitySupplied,
