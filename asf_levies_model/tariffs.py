@@ -196,11 +196,11 @@ use the calculate_nil_consumption method.
 
     def __str__(self):
         """String representation of tariff name."""
-        return f"{self.name}"
+        return f'{self.name}, price cap period= "{repr(self.price_cap_period)}"'
 
     def __repr__(self):
         """Representation of tariff name and fuel."""
-        return f'{type(self).__name__}(name="{self.name}", fuel="{self.fuel}")'
+        return f'{type(self).__name__}(name="{self.name}", fuel="{self.fuel}", price cap period= "{repr(self.price_cap_period)}")'
 
 
 class ElectricityStandardCredit(Tariff):

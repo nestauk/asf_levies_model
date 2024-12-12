@@ -388,7 +388,7 @@ class Levy:
         ]
 
         return repr(
-            f'Levy(name="{self.name}", short_name="{self.short_name}", {", ".join([f"{attr}={getattr(self, attr)}" for attr in non_zero])})'
+            f'Levy(name="{self.name}", short_name="{self.short_name}", price_cap_period="{repr(self.price_cap_period)}", {", ".join([f"{attr}={getattr(self, attr)}" for attr in non_zero])})'
         )
 
     def __str__(self):
