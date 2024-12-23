@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import Optional
 
-from tariffs import Tariff
+from asf_levies_model.tariffs import Tariff
 
 
 class Consumer:
