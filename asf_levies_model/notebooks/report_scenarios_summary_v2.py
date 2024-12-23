@@ -1,21 +1,3 @@
-# -*- coding: utf-8 -*-
-# ---
-# jupyter:
-#   jupytext:
-#     cell_metadata_filter: -all
-#     comment_magics: true
-#     custom_cell_magics: kql
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.2
-#   kernelspec:
-#     display_name: asf_levies_model
-#     language: python
-#     name: python3
-# ---
-
 # %%
 import pandas as pd
 import copy
@@ -54,8 +36,9 @@ from asf_levies_model import config, PROJECT_DIR
 
 from asf_levies_model.consumers import Consumer
 
+
 # %% [markdown]
-# **Status quo levies from Annex 4**
+#  **Status quo levies from Annex 4**
 
 # %%
 # Assign denominator values
@@ -63,6 +46,7 @@ supply_elec = 94_200_366
 supply_gas = 265_197_947
 customers_gas = 24_503_683
 customers_elec = 29_078_770
+
 
 # %%
 # Scaling factor for estimating domestic share of FIT revenue
@@ -72,6 +56,7 @@ total_supply_elec = (
 exempt_eii_supply = 9_417_916  # Oct-Dec2024 period, Annex 4, New FIT methodology tab
 fit_scaling_factor = supply_elec / (total_supply_elec - exempt_eii_supply)
 
+
 # %%
 # Instantiate status quo levies with Annex 4 data
 fileobject = download_annex_4(as_fileobject=True)
@@ -79,7 +64,11 @@ levies = [
     RO.from_dataframe(process_data_RO(fileobject), denominator=supply_elec),
     AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=supply_elec),
     GGL.from_dataframe(process_data_GGL(fileobject), denominator=customers_gas),
-    WHD.from_dataframe(process_data_WHD(fileobject)),
+    WHD.from_dataframe(
+        process_data_WHD(fileobject),
+        customers_gas=customers_gas,
+        customers_elec=customers_elec,
+    ),
     ECO.from_dataframe(process_data_ECO(fileobject)),
     FIT.from_dataframe(
         process_data_FIT(fileobject),
@@ -88,14 +77,16 @@ levies = [
 ]
 fileobject.close()
 
+
 # %%
 # Create dictionary of denominators for each levy
 denominators = set_common_denominators(
     levies, supply_elec, supply_gas, customers_gas, customers_elec
 )
 
+
 # %% [markdown]
-# **Defining rebalancing weights for each scenario**
+#  **Defining rebalancing weights for each scenario**
 
 # %%
 # Scenario 1: Status quo weights which reflect denominators
@@ -117,6 +108,7 @@ levies = [
     for levy in levies
 ]
 
+
 # %%
 # Scenario 2: Weights for full removal of policy costs on electricity
 sq_electricity_removal_weights = create_scenario_weights_dict(levies)
@@ -133,6 +125,7 @@ for levy in [levy.short_name for levy in levies if levy.electricity_weight > 0]:
         "new_fixed_weight_elec",
     ]:
         sq_electricity_removal_weights[levy][weight_type] = 0
+
 
 # %%
 # Scenario 3:  Weights for removal to general taxation of RO and FIT only
@@ -152,6 +145,7 @@ for levy in ["ro", "fit"]:
     ]:
         remove_ro_fit_weights[levy][weight_type] = 0
 
+
 # %%
 # Scenario 4:  Weights for full rebalancing from electricity to all gas
 sq_all_gas_weights = create_scenario_weights_dict(levies)
@@ -166,6 +160,7 @@ for levy in [levy for levy in levies if levy.electricity_weight > 0]:
         "new_variable_weight_gas": levy.electricity_variable_weight,
         "new_fixed_weight_gas": levy.electricity_fixed_weight,
     }
+
 
 # %%
 # Scenario 5:  Weights for rebalancing from electricity to gas of RO and FIT only
@@ -182,15 +177,18 @@ for levy in [levy for levy in levies if levy.short_name in ["ro", "fit"]]:
         "new_fixed_weight_gas": levy.electricity_fixed_weight,
     }
 
+
 # %%
 # Scenario 6: Weights for Double WHD, full removal on electricity
 # Weights are the same as Scenario 2
 double_whd_electricity_removal_weights = sq_electricity_removal_weights
 
+
 # %%
 # Scenario 7: Weights for Double WHD, full rebalancing to gas
 # Weights are the same as Scenario 4
 double_whd_all_gas_weights = sq_all_gas_weights
+
 
 # %%
 # Create a dictionary of {scenario name: rebalancing weights}
@@ -203,13 +201,15 @@ scenario_weights = {
     "7. Double WHD and rebalance all electricity to gas": double_whd_all_gas_weights,
 }
 
+
 # %%
 # Distinguish between scenarios using status quo levies set and scenarios using double WHD levies set
 scenarios_set_1 = list(scenario_weights.keys())[:4]
 scenarios_set_2 = list(scenario_weights.keys())[-2:]
 
+
 # %% [markdown]
-# **Levies for each scenario**
+#  **Levies for each scenario**
 
 # %%
 # Create a dictionary of {scenario name: levies}
@@ -237,8 +237,9 @@ for scenario_name in scenarios_set_2:
         double_whd_levies, scenario_weights, denominators, scenario_name
     )
 
+
 # %% [markdown]
-# **Tariffs for each scenario**
+#  **Tariffs for each scenario**
 
 # %%
 # Load tariff (Other Payment method) data from Annex 9
@@ -280,6 +281,7 @@ for scenario_name in scenario_weights.keys():
     baseline_tariff.name = str(scenario_name) + ": " + baseline_tariff.name
     gas_tariffs[scenario_name] = baseline_tariff
 
+
 # %%
 # Update baseline tariff policy costs to match denominator adjusted policy costs
 elec_tariffs["baseline"].pc_nil = sum(
@@ -294,6 +296,7 @@ gas_tariffs["baseline"].pc_nil = sum(
 gas_tariffs["baseline"].pc = sum(
     [levy.calculate_levy(0, 1, False, False) for levy in levies]
 )
+
 
 # %%
 # Update tariff policy costs with rebalanced levies
@@ -323,12 +326,14 @@ for scenario_name in scenario_weights.keys():
         ]
     )
 
+
 # %% [markdown]
-# **Consumers for each scenario**
+#  **Consumers for each scenario**
 
 # %%
 # Load archetypes headline data
 ofgem_archetypes_df = ofgem_archetypes_data()
+
 
 # %%
 # Create a dictionary of {scenario name: list of Consumers} (Typical and average Ofgem archetypes only, n=25)
@@ -354,8 +359,9 @@ for scenario_name in scenarios_set_1:
         for row in range(25)
     ]
 
+
 # %% [markdown]
-# We need to instantiate two sets of Consumer objects for the double WHD scenarios - one set that is eligible and one set that is ineligible.
+#  We need to instantiate two sets of Consumer objects for the double WHD scenarios - one set that is eligible and one set that is ineligible.
 
 # %%
 # Creating an input dataframe that has two sets of profiles - eligible and ineligible
@@ -369,6 +375,7 @@ ofgem_archetypes_df_ineligible["whd_eligible"] = False
 ofgem_archetypes_df_whd_eligibility = pd.concat(
     [ofgem_archetypes_df_eligible, ofgem_archetypes_df_ineligible], ignore_index=True
 )
+
 
 # %%
 # Scenarios with WHD eligibility criteria
@@ -423,6 +430,7 @@ for scenario in scenarios_set_2:
         else:
             raise ValueError("No eligibility specified")
 
+
 # %%
 # Apply £150 discount to eligible consumers for baseline scenario considering eligibility
 for consumer in consumers["baseline with whd eligibility"]:
@@ -443,8 +451,9 @@ for scenario in scenarios_set_2[1:3]:
                 adjustment_mode="flat adjustment",
             )
 
+
 # %% [markdown]
-# **Results dataframe for scenarios 1 (Baseline) to 5**
+#  **Results dataframe for scenarios 1 (Baseline) to 5**
 
 # %%
 # Create a summary dataframe, in tidy format, for all consumer profiles and scenarios
@@ -455,6 +464,7 @@ for scenario in scenarios_set_1:
     tidy["scenario"] = scenario
 
     tidy_summary_1 = pd.concat([tidy_summary_1, tidy])
+
 
 # %%
 # Reshaping to recreate Martina's table for the summary chart
@@ -472,6 +482,7 @@ scenarios_summary_chart_1 = tidy_summary_1.pivot_table(
     aggfunc="first",
 ).reset_index()
 
+
 # %%
 scenarios_summary_chart_1 = scenarios_summary_chart_1[
     [
@@ -480,26 +491,27 @@ scenarios_summary_chart_1 = scenarios_summary_chart_1[
         "main_heating_fuel",
         "electricity_bill",
         "gas_bill",
-        "dual_fuel_bill",
+        "combined_fuel_bill",
     ]
 ].sort_values(by=["scenario", "Name"])
 
 # Create new column for bill change from baseline
 baseline = scenarios_summary_chart_1[
     scenarios_summary_chart_1["scenario"] == "1. Baseline"
-].set_index("Name")["dual_fuel_bill"]
+].set_index("Name")["combined_fuel_bill"]
 
 scenarios_summary_chart_1["Bill change from baseline"] = (
     scenarios_summary_chart_1.apply(
-        lambda row: row["dual_fuel_bill"] - baseline.get(row["Name"], 0),
+        lambda row: row["combined_fuel_bill"] - baseline.get(row["Name"], 0),
         axis=1,
     )
 )
 
 scenarios_summary_chart_1 = scenarios_summary_chart_1.reset_index(drop=True)
 
+
 # %% [markdown]
-# **Results dataframe for scenarios 1 alternative (Double WHD Baseline), 6 and 7**
+#  **Results dataframe for scenarios 1 alternative (Double WHD Baseline), 6 and 7**
 
 # %%
 # Create a summary dataframe, in tidy format, for all consumer profiles and scenarios
@@ -510,6 +522,7 @@ for scenario in scenarios_set_2:
     tidy["scenario"] = scenario
 
     tidy_summary_2 = pd.concat([tidy_summary_2, tidy])
+
 
 # %%
 # Reshaping to recreate Martina's table for the summary chart
@@ -536,23 +549,24 @@ scenarios_summary_chart_2 = scenarios_summary_chart_2[
         "main_heating_fuel",
         "electricity_bill",
         "gas_bill",
-        "dual_fuel_bill",
+        "combined_fuel_bill",
     ]
 ].sort_values(by=["scenario", "Name"])
 
 # Create new column for bill change from baseline
 baseline = scenarios_summary_chart_2[
     scenarios_summary_chart_2["scenario"] == "1. Baseline"
-].set_index("Name")["dual_fuel_bill"]
+].set_index("Name")["combined_fuel_bill"]
 
 scenarios_summary_chart_2["Bill change from baseline"] = (
     scenarios_summary_chart_2.apply(
-        lambda row: row["dual_fuel_bill"] - baseline.get(row["Name"], 0),
+        lambda row: row["combined_fuel_bill"] - baseline.get(row["Name"], 0),
         axis=1,
     )
 )
 
 scenarios_summary_chart_2 = scenarios_summary_chart_2.reset_index(drop=True)
+
 
 # %%
 # Construct look up table for full archetype and WHD eligible/ineligible size
@@ -579,6 +593,7 @@ whd_eligibility_df.loc[0, "WHDEligibleSize"] = 0
 whd_eligibility_df["WHDIneligibleSize"] = (
     whd_eligibility_df["ArchetypeSize"] - whd_eligibility_df["WHDEligibleSize"]
 )
+
 
 # %%
 # Add column with original archetype name
@@ -609,8 +624,9 @@ scenarios_summary_chart_2 = scenarios_summary_chart_2.drop(
     ]
 )
 
+
 # %% [markdown]
-# **Electricity to gas unit cost ratios**
+#  **Electricity to gas unit cost ratios**
 
 # %%
 # Calculate electricity-to-gas cost ratios for both sets of scenarios
@@ -626,13 +642,14 @@ cost_ratio_frame = pd.DataFrame(
     {"Scenario": scenarios, "Electricity to gas unit cost ratio": scenario_ratios}
 ).reset_index(drop=True)
 
+
 # %% [markdown]
-# **Total cost to gas, electricity and general taxation for each scenario**
+#  **Total cost to gas, electricity and general taxation for each scenario**
 
 # %%
 revenue_streams_df = pd.DataFrame()
 
-# Calculate cos streams for baseline
+# Calculate cost streams for baseline
 scenario_weights["baseline"] = status_quo
 baseline_row = calculate_cost_stream("baseline", scenario_weights, levies)
 revenue_streams_df = pd.concat([revenue_streams_df, baseline_row])
@@ -656,8 +673,9 @@ first_col = revenue_streams_df.pop("Scenario")
 revenue_streams_df.insert(0, "Scenario", first_col)
 revenue_streams_df = revenue_streams_df.sort_values(by="Scenario")
 
+
 # %% [markdown]
-# **Fuel poverty rates**
+#  **Fuel poverty rates**
 
 # %%
 # Load archetype income deciles data
@@ -671,6 +689,7 @@ archetypes_net_income_deciles_full_df = archetypes_net_income_deciles_full_df[
 archetypes_net_income_deciles_full_df = (
     archetypes_net_income_deciles_full_df.reset_index(drop=True)
 )
+
 
 # %%
 # Create a dictionary of {scenario name: list of Consumers by archetype income decile} (Typical and average Ofgem archetypes only, n=25)
@@ -703,6 +722,7 @@ for scenario_name in list(scenario_weights.keys()):
     for consumer in consumers[scenario_name]:
         consumer.name = consumer.archetype + "_" + str(consumer.net_income_decile)
 
+
 # %%
 # Estimate fuel poverty rates for each archetype
 percentage_in_fuel_poverty_df = calculate_fuel_poverty_rates(
@@ -715,8 +735,9 @@ last_column = columns.pop(-1)
 columns.insert(1, last_column)
 percentage_in_fuel_poverty_df = percentage_in_fuel_poverty_df[columns]
 
+
 # %% [markdown]
-# **Saving all output dataframes to Excel workbook**
+#  **Saving all output dataframes to Excel workbook**
 
 # %%
 # Get today's date
@@ -727,6 +748,7 @@ date_str = today.strftime("%Y%m%d")
 
 # Define the filename with today's date
 filename = f"{PROJECT_DIR}/outputs/data/scenarios_data_{date_str}.xlsx"
+
 
 # %%
 # Create an Excel writer object
@@ -751,5 +773,3 @@ with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
     ofgem_archetypes_df.to_excel(
         writer, sheet_name="Underlying headline data", index=False
     )
-
-# %%
