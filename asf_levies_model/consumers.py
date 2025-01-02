@@ -1,4 +1,5 @@
 import pandas as pd
+import copy
 from typing import Optional
 
 from asf_levies_model.tariffs import Tariff
@@ -232,7 +233,8 @@ class Consumer:
         adjustment_fuel: str,
         adjustment_parameter: float,
         adjustment_mode: str,
-    ) -> None:
+        inplace: bool = False,
+    ) -> "Consumer | None":
         """Overwrites the electricity or gas bill property with an updated value reflected a social support adjustment (discount or additional cost).
 
         Parameters
@@ -246,6 +248,8 @@ class Consumer:
             (c) unit discount: Value (£/MWh) to be multiplied by fuel consumption, and product subtracted from the subtotal bill.
         adjustment_mode : str
             Acceptable strings are "flat adjustment", "percentage discount" and "unit discount".
+        inplace : bool
+            Make fuel bill change in place (True) or return copy (False), by default False.
 
         Raises
         ------
@@ -254,48 +258,48 @@ class Consumer:
         ValueError
             Error raised if an invalid fuel type is provided.
         """
-        if adjustment_fuel == "electricity":
-            if adjustment_mode == "flat adjustment":
-                self.electricity_bill = (
-                    self.electricity_subtotal_bill + adjustment_parameter
-                )
-                self._adjustment_mode = adjustment_mode
-            elif adjustment_mode == "percentage discount":
-                self.electricity_bill = self.electricity_subtotal_bill * (
-                    (100 - adjustment_parameter) / 100
-                )
-                self._adjustment_mode = adjustment_mode
-            elif adjustment_mode == "unit discount":
-                self.electricity_bill = self.electricity_subtotal_bill - (
-                    self.electricity_consumption * adjustment_parameter
-                )
-                self._adjustment_mode = adjustment_mode
-            else:
-                raise ValueError(
-                    "Please provide an adjustment mode from the following: flat adjustment, percentage_discount, unit discount"
-                )
-        elif adjustment_fuel == "gas":
-            if adjustment_mode == "flat adjustment":
-                self.gas_bill = self.gas_subtotal_bill + adjustment_parameter
-                self._adjustment_mode = adjustment_mode
-            elif adjustment_mode == "percentage discount":
-                self.gas_bill = self.gas_subtotal_bill * (
-                    (100 - adjustment_parameter) / 100
-                )
-                self._adjustment_mode = adjustment_mode
-            elif adjustment_mode == "unit discount":
-                self.gas_bill = self.gas_subtotal_bill - (
-                    self.gas_consumption * adjustment_parameter
-                )
-                self._adjustment_mode = adjustment_mode
-            else:
-                raise ValueError(
-                    "Please provide an adjustment mode from the following: flat adjustment, percentage_discount, unit discount"
-                )
-        else:
+        # Work with a copy if not inplace
+        obj = self if inplace else copy.deepcopy(self)
+
+        # Check valid fuel type is given
+        if adjustment_fuel not in ["electricity", "gas"]:
             raise ValueError(
                 "Please specify the fuel bill to adjust (electricity or gas)."
             )
+
+        # Define lookup dictionaries
+        total_bill = {"electricity": "electricity_bill", "gas": "gas_bill"}
+        subtotal_bill = {
+            "electricity": self.electricity_subtotal_bill,
+            "gas": self.gas_subtotal_bill,
+        }
+        consumption = {
+            "electricity": self.electricity_consumption,
+            "gas": self.gas_consumption,
+        }
+
+        # Calculate adjusted total bills
+        if adjustment_mode == "flat adjustment":
+            adjusted_bill = subtotal_bill[adjustment_fuel] + adjustment_parameter
+        elif adjustment_mode == "percentage discount":
+            adjusted_bill = subtotal_bill[adjustment_fuel] * (
+                (100 - adjustment_parameter) / 100
+            )
+        elif adjustment_mode == "unit discount":
+            adjusted_bill = subtotal_bill[adjustment_fuel] - (
+                consumption[adjustment_fuel] * adjustment_parameter
+            )
+        else:
+            raise ValueError(
+                "Please provide an adjustment mode from the following: flat adjustment, percentage_discount, unit discount"
+            )
+
+        # Update attributes
+        setattr(obj, total_bill[adjustment_fuel], adjusted_bill)
+        obj._adjustment_mode = adjustment_mode
+
+        # Return updated Consumer object if not inplace
+        return None if inplace else obj
 
     def get_tidy_summary(self) -> pd.DataFrame:
         """Returns a dataframe containing all public attributes and properties, except name which has a dedicated column.
