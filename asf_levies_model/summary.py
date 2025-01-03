@@ -575,16 +575,18 @@ def calculate_fuel_poverty_rates(consumers: Dict, scenario_names: List) -> pd.Da
     def _calculate_percentage_in_fuel_poverty(fp_gap_pivot, archetypes, scenario):
         percentages = []
         for archetype in archetypes:
-            total_size = fp_gap_pivot[
+            total_size = fp_gap_pivot.loc[
                 (fp_gap_pivot["archetype"] == archetype)
-                & (fp_gap_pivot["scenario"] == scenario)
-            ]["size"].sum()
+                & (fp_gap_pivot["scenario"] == scenario),
+                "size",
+            ].sum()
 
-            fuel_poor_size = fp_gap_pivot[
+            fuel_poor_size = fp_gap_pivot.loc[
                 (fp_gap_pivot["archetype"] == archetype)
-                & (fp_gap_pivot["in_fuel_poverty"])
                 & (fp_gap_pivot["scenario"] == scenario)
-            ]["size"].sum()
+                & (fp_gap_pivot["in_fuel_poverty"] == True),
+                "size",
+            ].sum()
 
             percentage = (fuel_poor_size / total_size) * 100 if total_size > 0 else 0
             percentages.append(percentage)
