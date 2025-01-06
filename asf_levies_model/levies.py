@@ -694,8 +694,7 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
             latest_index = (
                 df[["TariffCurrentYear", "TariffPreviousYear"]]
                 .isna()
-                .apply(
-                    lambda row: row["TariffCurrentYear"] & row["TariffPreviousYear"],
+                .all(axis=1)
                     axis=1,
                 )
                 .to_numpy()
