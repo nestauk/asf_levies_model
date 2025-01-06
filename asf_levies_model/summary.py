@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 
 def _sum_levies(val: float, summary: str, fuel: str, levies: list) -> float:
@@ -445,3 +445,195 @@ It is assumed that the rebalancing weights are the same for each levy.
     )
 
     return summary_bill_costs
+
+
+def calculate_cost_stream(
+    scenario: str, scenario_weights: Dict, levies: List
+) -> pd.DataFrame:
+    """Returns a dataframe containing one row describing revenue streams for a scenario (Electricity/Gas/Tax/Total).
+
+    Parameters
+    ----------
+    scenario : str
+        Name of scenario of interest.
+    scenario_weights : Dict
+        Dictionary of dictionaries where key is the name of the scenario and value is dictionary of rebalancing weights for each levy.
+    levies : List
+        List of levy objects used in scenario.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe containing electricity, gas, tax and total revenue costs, in £ per year.
+    """
+    cost_to_elec = sum(
+        (
+            scenario_weights.get(scenario)
+            .get(levy.short_name)
+            .get("new_electricity_weight")
+        )
+        * levy.revenue
+        for levy in levies
+    )
+    cost_to_gas = sum(
+        (scenario_weights.get(scenario).get(levy.short_name).get("new_gas_weight"))
+        * levy.revenue
+        for levy in levies
+    )
+    cost_to_tax = sum(
+        (scenario_weights.get(scenario).get(levy.short_name).get("new_tax_weight"))
+        * levy.revenue
+        for levy in levies
+    )
+    total_cost = cost_to_elec + cost_to_gas + cost_to_tax
+
+    cost_streams_row = [
+        {
+            "Scenario": scenario,
+            "Total cost levied on electricity": cost_to_elec,
+            "Total cost levied on gas": cost_to_gas,
+            "Total cost levied to general taxation": cost_to_tax,
+            "Total policy cost revenue": total_cost,
+        }
+    ]
+
+    df = pd.DataFrame(cost_streams_row)
+
+    return df
+
+
+def set_common_denominators(
+    levies: List,
+    supply_elec: float,
+    supply_gas: float,
+    customers_gas: int,
+    customers_elec: int,
+) -> Dict:
+    """Returns a dictionary of common denominators for each levy.
+
+    Parameters
+    ----------
+    levies : List
+        List of levy objects.
+    supply_elec : float
+        Amount of annual electricity supply to use for rebalancing, in MWh.
+    supply_gas : float
+        Amount of annual gas supply to use for rebalancing, in MWh.
+    customers_gas : int
+        Number of customers paying for gas in a given year to use for rebalancing.
+    customers_elec : int
+        Number of customers paying for electricity in a given year to use for rebalancing.
+
+    """
+    denominator_values = {
+        "supply_elec": supply_elec,
+        "supply_gas": supply_gas,
+        "customers_gas": customers_gas,
+        "customers_elec": customers_elec,
+    }
+
+    return {key: denominator_values for key in [levy.short_name for levy in levies]}
+
+
+def calculate_fuel_poverty_rates(consumers: Dict, scenario_names: List) -> pd.DataFrame:
+    """Returns a DataFrame containing percentage of fuel poor households in each archetype, for a set of rebalancing scenarios.
+
+    Parameters
+    ----------
+    consumers : Dict
+        Dictionary of Consumer objects where key is rebalancing scenario name (str) and value is a List of Consumer objects with tariff attributes corresponding to the rebalancing scenario.
+    scenario_names : List
+        List of rebalancing scenario names (str) being considered.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame where rows are archetypes, columns are rebalancing scenario names and values are percentage that is in fuel poverty.
+    """
+
+    # Consumers summary dataframe
+    tidy_summary = pd.DataFrame()
+    for scenario_name in scenario_names:
+        tidy = pd.concat(
+            [consumer.get_tidy_summary() for consumer in consumers[scenario_name]]
+        )
+        tidy["scenario"] = scenario_name
+        tidy_summary = pd.concat([tidy_summary, tidy])
+
+    # Convert to pivot table
+    fp_gap_pivot = tidy_summary.pivot_table(
+        index=["Name", "scenario"], values="Value", columns="Attribute", aggfunc="first"
+    )
+    fp_gap_pivot = fp_gap_pivot[
+        ["archetype", "net_income_decile", "fuel_poverty_gap", "size"]
+    ].reset_index()
+
+    # Create new column to indicate if in fuel poverty
+    fp_gap_pivot["in_fuel_poverty"] = fp_gap_pivot["fuel_poverty_gap"] != 0
+
+    # Helper function to calculate percentage of households in archetype in fuel poverty
+    def _calculate_percentage_in_fuel_poverty(fp_gap_pivot, archetypes, scenario):
+        percentages = []
+        for archetype in archetypes:
+            total_size = fp_gap_pivot.loc[
+                (fp_gap_pivot["archetype"] == archetype)
+                & (fp_gap_pivot["scenario"] == scenario),
+                "size",
+            ].sum()
+
+            fuel_poor_size = fp_gap_pivot.loc[
+                (fp_gap_pivot["archetype"] == archetype)
+                & (fp_gap_pivot["scenario"] == scenario)
+                & (fp_gap_pivot["in_fuel_poverty"] == True),
+                "size",
+            ].sum()
+
+            percentage = (fuel_poor_size / total_size) * 100 if total_size > 0 else 0
+            percentages.append(percentage)
+        return percentages
+
+    # Populate list of archetype names
+    archetypes = list(fp_gap_pivot["archetype"].unique())
+
+    # Populate dictionary of fuel poverty percentages for each scenario
+    percentages_dict = {
+        f"{scenario} Percentage in fuel poverty (%)": _calculate_percentage_in_fuel_poverty(
+            fp_gap_pivot, archetypes, scenario
+        )
+        for scenario in scenario_names
+    }
+
+    # Write fuel poverty rates to dataframe
+    percentage_in_fuel_poverty_df = pd.DataFrame(
+        {"Archetype": archetypes, **percentages_dict}
+    )
+
+    return percentage_in_fuel_poverty_df
+
+
+def create_scenario_weights_dict(levies: List) -> Dict:
+    """Sets up a dictionary of dictionaries describing revenue-based weights for each levy.
+
+    Parameters
+    ----------
+    levies : List
+        List of levy objects.
+
+    Returns
+    -------
+    Dict
+        Dictionary of dictionaries {levy short name: {weight type: weight value}} where
+        weight types correspond to electricity, gas and tax; as well as fixed, variable for electricity and gas.
+    """
+    weights = {}
+    for levy in levies:
+        weights[levy.short_name] = {
+            "new_electricity_weight": levy.electricity_weight,
+            "new_gas_weight": levy.gas_weight,
+            "new_tax_weight": levy.tax_weight,
+            "new_variable_weight_elec": levy.electricity_variable_weight,
+            "new_fixed_weight_elec": levy.electricity_fixed_weight,
+            "new_variable_weight_gas": levy.gas_variable_weight,
+            "new_fixed_weight_gas": levy.gas_fixed_weight,
+        }
+    return weights

@@ -902,3 +902,7 @@ def ofgem_archetypes_net_income_deciles() -> pd.DataFrame:
 def ofgem_archetypes_retired_pension() -> pd.DataFrame:
     """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households with retired economic status or in receipt of pension guarantee/savings credit."""
     return _ofgem_archetypes_dataset("retired_pension")
+
+
+def ofgem_archetypes_net_income_deciles_full() -> pd.DataFrame:
+    return _ofgem_archetypes_dataset("net_income_deciles_full")
