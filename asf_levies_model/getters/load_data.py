@@ -49,6 +49,122 @@ else:
     # If no data_output root has been given, just use the base PROJECT_DIR
     ARCHETYPE_DATA_ROOT = str(PROJECT_DIR) + "/"
 
+# Create 28AD Charge restriction period index
+
+_outer_idx = pd.IntervalIndex.from_tuples(
+    [
+        (pd.to_datetime("2015-04-01 00:00:00"), pd.to_datetime("2015-09-30 23:59:59")),
+        (pd.to_datetime("2015-10-01 00:00:00"), pd.to_datetime("2016-03-31 23:59:59")),
+        (pd.to_datetime("2016-04-01 00:00:00"), pd.to_datetime("2016-09-30 23:59:59")),
+        (pd.to_datetime("2016-10-01 00:00:00"), pd.to_datetime("2017-03-31 23:59:59")),
+        (pd.to_datetime("2017-04-01 00:00:00"), pd.to_datetime("2017-09-30 23:59:59")),
+        (pd.to_datetime("2017-10-01 00:00:00"), pd.to_datetime("2018-03-31 23:59:59")),
+        (pd.to_datetime("2018-04-01 00:00:00"), pd.to_datetime("2018-09-30 23:59:59")),
+        (pd.to_datetime("2018-10-01 00:00:00"), pd.to_datetime("2019-03-31 23:59:59")),
+        (pd.to_datetime("2019-01-01 00:00:00"), pd.to_datetime("2019-03-31 23:59:59")),
+        (pd.to_datetime("2019-04-01 00:00:00"), pd.to_datetime("2019-09-30 23:59:59")),
+        (pd.to_datetime("2019-10-01 00:00:00"), pd.to_datetime("2020-03-31 23:59:59")),
+        (pd.to_datetime("2020-04-01 00:00:00"), pd.to_datetime("2020-09-30 23:59:59")),
+        (pd.to_datetime("2020-10-01 00:00:00"), pd.to_datetime("2021-03-31 23:59:59")),
+        (pd.to_datetime("2021-04-01 00:00:00"), pd.to_datetime("2021-09-30 23:59:59")),
+        (pd.to_datetime("2021-10-01 00:00:00"), pd.to_datetime("2022-03-31 23:59:59")),
+        (pd.to_datetime("2022-04-01 00:00:00"), pd.to_datetime("2022-09-30 23:59:59")),
+        (pd.to_datetime("2022-10-01 00:00:00"), pd.to_datetime("2023-03-31 23:59:59")),
+        (pd.to_datetime("2022-10-01 00:00:00"), pd.to_datetime("2023-03-31 23:59:59")),
+        (pd.to_datetime("2023-04-01 00:00:00"), pd.to_datetime("2023-09-30 23:59:59")),
+        (pd.to_datetime("2023-04-01 00:00:00"), pd.to_datetime("2023-09-30 23:59:59")),
+        (pd.to_datetime("2023-10-01 00:00:00"), pd.to_datetime("2024-03-31 23:59:59")),
+        (pd.to_datetime("2023-10-01 00:00:00"), pd.to_datetime("2024-03-31 23:59:59")),
+        (pd.to_datetime("2024-04-01 00:00:00"), pd.to_datetime("2024-09-30 23:59:59")),
+        (pd.to_datetime("2024-04-01 00:00:00"), pd.to_datetime("2024-09-30 23:59:59")),
+        (pd.to_datetime("2024-10-01 00:00:00"), pd.to_datetime("2025-03-31 23:59:59")),
+        (pd.to_datetime("2024-10-01 00:00:00"), pd.to_datetime("2025-03-31 23:59:59")),
+        (pd.to_datetime("2025-04-01 00:00:00"), pd.to_datetime("2025-09-30 23:59:59")),
+        (pd.to_datetime("2025-04-01 00:00:00"), pd.to_datetime("2025-09-30 23:59:59")),
+        (pd.to_datetime("2025-10-01 00:00:00"), pd.to_datetime("2026-03-31 23:59:59")),
+        (pd.to_datetime("2025-10-01 00:00:00"), pd.to_datetime("2026-03-31 23:59:59")),
+        (pd.to_datetime("2026-04-01 00:00:00"), pd.to_datetime("2026-09-30 23:59:59")),
+        (pd.to_datetime("2026-04-01 00:00:00"), pd.to_datetime("2026-09-30 23:59:59")),
+        (pd.to_datetime("2026-10-01 00:00:00"), pd.to_datetime("2027-03-31 23:59:59")),
+        (pd.to_datetime("2026-10-01 00:00:00"), pd.to_datetime("2027-03-31 23:59:59")),
+        (pd.to_datetime("2027-04-01 00:00:00"), pd.to_datetime("2027-09-30 23:59:59")),
+        (pd.to_datetime("2027-04-01 00:00:00"), pd.to_datetime("2027-09-30 23:59:59")),
+        (pd.to_datetime("2027-10-01 00:00:00"), pd.to_datetime("2028-03-31 23:59:59")),
+        (pd.to_datetime("2027-10-01 00:00:00"), pd.to_datetime("2028-03-31 23:59:59")),
+        (pd.to_datetime("2028-04-01 00:00:00"), pd.to_datetime("2028-09-30 23:59:59")),
+        (pd.to_datetime("2028-04-01 00:00:00"), pd.to_datetime("2028-09-30 23:59:59")),
+        (pd.to_datetime("2028-10-01 00:00:00"), pd.to_datetime("2029-03-31 23:59:59")),
+        (pd.to_datetime("2028-10-01 00:00:00"), pd.to_datetime("2029-03-31 23:59:59")),
+        (pd.to_datetime("2029-04-01 00:00:00"), pd.to_datetime("2029-09-30 23:59:59")),
+        (pd.to_datetime("2029-04-01 00:00:00"), pd.to_datetime("2029-09-30 23:59:59")),
+        (pd.to_datetime("2029-10-01 00:00:00"), pd.to_datetime("2030-03-31 23:59:59")),
+        (pd.to_datetime("2029-10-01 00:00:00"), pd.to_datetime("2030-03-31 23:59:59")),
+        (pd.to_datetime("2030-04-01 00:00:00"), pd.to_datetime("2030-09-30 23:59:59")),
+        (pd.to_datetime("2030-04-01 00:00:00"), pd.to_datetime("2030-09-30 23:59:59")),
+        (pd.to_datetime("2030-10-01 00:00:00"), pd.to_datetime("2031-03-31 23:59:59")),
+    ],
+    closed="both",
+    name="28AD Charge Restriction Period 6 Month",
+)
+
+_inner_idx = pd.IntervalIndex.from_tuples(
+    [
+        (pd.to_datetime("2015-04-01 00:00:00"), pd.to_datetime("2015-09-30 23:59:59")),
+        (pd.to_datetime("2015-10-01 00:00:00"), pd.to_datetime("2016-03-31 23:59:59")),
+        (pd.to_datetime("2016-04-01 00:00:00"), pd.to_datetime("2016-09-30 23:59:59")),
+        (pd.to_datetime("2016-10-01 00:00:00"), pd.to_datetime("2017-03-31 23:59:59")),
+        (pd.to_datetime("2017-04-01 00:00:00"), pd.to_datetime("2017-09-30 23:59:59")),
+        (pd.to_datetime("2017-10-01 00:00:00"), pd.to_datetime("2018-03-31 23:59:59")),
+        (pd.to_datetime("2018-04-01 00:00:00"), pd.to_datetime("2018-09-30 23:59:59")),
+        (pd.to_datetime("2018-10-01 00:00:00"), pd.to_datetime("2019-03-31 23:59:59")),
+        (pd.to_datetime("2019-01-01 00:00:00"), pd.to_datetime("2019-03-31 23:59:59")),
+        (pd.to_datetime("2019-04-01 00:00:00"), pd.to_datetime("2019-09-30 23:59:59")),
+        (pd.to_datetime("2019-10-01 00:00:00"), pd.to_datetime("2020-03-31 23:59:59")),
+        (pd.to_datetime("2020-04-01 00:00:00"), pd.to_datetime("2020-09-30 23:59:59")),
+        (pd.to_datetime("2020-10-01 00:00:00"), pd.to_datetime("2021-03-31 23:59:59")),
+        (pd.to_datetime("2021-04-01 00:00:00"), pd.to_datetime("2021-09-30 23:59:59")),
+        (pd.to_datetime("2021-10-01 00:00:00"), pd.to_datetime("2022-03-31 23:59:59")),
+        (pd.to_datetime("2022-04-01 00:00:00"), pd.to_datetime("2022-09-30 23:59:59")),
+        (pd.to_datetime("2022-10-01 00:00:00"), pd.to_datetime("2022-12-31 23:59:59")),
+        (pd.to_datetime("2023-01-01 00:00:00"), pd.to_datetime("2023-03-31 23:59:59")),
+        (pd.to_datetime("2023-04-01 00:00:00"), pd.to_datetime("2023-06-30 23:59:59")),
+        (pd.to_datetime("2023-07-01 00:00:00"), pd.to_datetime("2023-09-30 23:59:59")),
+        (pd.to_datetime("2023-10-01 00:00:00"), pd.to_datetime("2023-12-31 23:59:59")),
+        (pd.to_datetime("2024-01-01 00:00:00"), pd.to_datetime("2024-03-31 23:59:59")),
+        (pd.to_datetime("2024-04-01 00:00:00"), pd.to_datetime("2024-06-30 23:59:59")),
+        (pd.to_datetime("2024-07-01 00:00:00"), pd.to_datetime("2024-09-30 23:59:59")),
+        (pd.to_datetime("2024-10-01 00:00:00"), pd.to_datetime("2024-12-31 23:59:59")),
+        (pd.to_datetime("2025-01-01 00:00:00"), pd.to_datetime("2025-03-31 23:59:59")),
+        (pd.to_datetime("2025-04-01 00:00:00"), pd.to_datetime("2025-06-30 23:59:59")),
+        (pd.to_datetime("2025-07-01 00:00:00"), pd.to_datetime("2025-09-30 23:59:59")),
+        (pd.to_datetime("2025-10-01 00:00:00"), pd.to_datetime("2025-12-31 23:59:59")),
+        (pd.to_datetime("2026-01-01 00:00:00"), pd.to_datetime("2026-03-31 23:59:59")),
+        (pd.to_datetime("2026-04-01 00:00:00"), pd.to_datetime("2026-06-30 23:59:59")),
+        (pd.to_datetime("2026-07-01 00:00:00"), pd.to_datetime("2026-09-30 23:59:59")),
+        (pd.to_datetime("2026-10-01 00:00:00"), pd.to_datetime("2026-12-31 23:59:59")),
+        (pd.to_datetime("2027-01-01 00:00:00"), pd.to_datetime("2027-03-31 23:59:59")),
+        (pd.to_datetime("2027-04-01 00:00:00"), pd.to_datetime("2027-06-30 23:59:59")),
+        (pd.to_datetime("2027-07-01 00:00:00"), pd.to_datetime("2027-09-30 23:59:59")),
+        (pd.to_datetime("2027-10-01 00:00:00"), pd.to_datetime("2027-12-31 23:59:59")),
+        (pd.to_datetime("2028-01-01 00:00:00"), pd.to_datetime("2028-03-31 23:59:59")),
+        (pd.to_datetime("2028-04-01 00:00:00"), pd.to_datetime("2028-06-30 23:59:59")),
+        (pd.to_datetime("2028-07-01 00:00:00"), pd.to_datetime("2028-09-30 23:59:59")),
+        (pd.to_datetime("2028-10-01 00:00:00"), pd.to_datetime("2028-12-31 23:59:59")),
+        (pd.to_datetime("2029-01-01 00:00:00"), pd.to_datetime("2029-03-31 23:59:59")),
+        (pd.to_datetime("2029-04-01 00:00:00"), pd.to_datetime("2029-06-30 23:59:59")),
+        (pd.to_datetime("2029-07-01 00:00:00"), pd.to_datetime("2029-09-30 23:59:59")),
+        (pd.to_datetime("2029-10-01 00:00:00"), pd.to_datetime("2029-12-31 23:59:59")),
+        (pd.to_datetime("2030-01-01 00:00:00"), pd.to_datetime("2030-03-31 23:59:59")),
+        (pd.to_datetime("2030-04-01 00:00:00"), pd.to_datetime("2030-06-30 23:59:59")),
+        (pd.to_datetime("2030-07-01 00:00:00"), pd.to_datetime("2030-09-30 23:59:59")),
+        (pd.to_datetime("2030-10-01 00:00:00"), pd.to_datetime("2030-12-31 23:59:59")),
+    ],
+    closed="both",
+    name="28AD Charge Restriction Period 3 Month",
+)
+
+index_28AD = pd.MultiIndex.from_arrays([_outer_idx, _inner_idx])
+
 
 # Functions for getting and processing Annex 4 data
 
@@ -260,6 +376,9 @@ def _process_data(
     data_tidy_df["UpdateDate"] = pd.to_datetime(
         data_tidy_df["UpdateDate"], format="%B %Y"
     )
+    # Add 28AD charge restriction index
+    data_tidy_df = data_tidy_df.set_index(index_28AD)
+
     return data_tidy_df
 
 
@@ -366,19 +485,6 @@ def validate_input_data(policy_data_tidy_df: pd.DataFrame, policy_data_schema: d
         print(exc)
 
 
-def _get_charging_periods(policy_df: pd.DataFrame) -> List[np.array]:
-    """Populates a list of lists containing the 28AD charge restriction periods
-    (specific to 3i New FIT methodology tab in annex 4)."""
-    row_indices = (
-        (policy_df == "28AD charge restriction period:")
-        .sum(axis=1)
-        .astype(bool)
-        .pipe(lambda df: df.index[df])[-2:]
-    )
-    periods = policy_df.loc[row_indices].dropna(axis=1, how="all").to_numpy()
-    return [periods[0][1:], periods[1][1:]]
-
-
 def _get_lookup_periods(policy_df: pd.DataFrame) -> np.array:
     """Populates a list containing lookup periods
     (specific to Table 5 in 3i New FIT methodology tab in annex 4)."""
@@ -389,15 +495,6 @@ def _get_lookup_periods(policy_df: pd.DataFrame) -> np.array:
         .pipe(lambda df: df.index[df])
     )
     return policy_df.loc[lookup_period_row_index].dropna(axis=1).to_numpy()[0][1:]
-
-
-def _check_periods(charge_period_1: list, charge_period_2: list, lookup_period: list):
-    """Checks if number of charge periods and lookup periods are equal."""
-    if len(charge_period_1) == len(charge_period_2) == len(lookup_period):
-        print(f"Number of entries: {len(charge_period_1)}")
-        return True
-    else:
-        return False
 
 
 def _extract_FIT_policy_data(
@@ -425,15 +522,8 @@ def process_data_FIT(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding New FIT tab in annex 4 into tidy format."""
     # Create dataframe of raw FIT data from spreadsheet tab
     FIT_df = _get_raw_dataframe_annex4("New FIT", fileobject)
-    # Create list of 28AD charge restriction periods (Table 5)
-    charge_periods = _get_charging_periods(FIT_df)
-    charge_periods_1 = charge_periods[0]
-    charge_periods_2 = charge_periods[1]
     # Create list of lookup periods (Table 5)
     lookup_periods = _get_lookup_periods(FIT_df)
-    # Check charge restriction periods and lookup periods match
-    if not _check_periods(charge_periods_1, charge_periods_2, lookup_periods):
-        raise ValueError("Number of time periods do not match!")
     # Create a list for each parameter of interest
     parameter_names = [
         "Inflated Levelisation fund (£)",
@@ -452,8 +542,6 @@ def process_data_FIT(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     # Create dataframe containing FIT data in tidy format
     data_tidy_df = pd.concat(
         [
-            pd.Series(charge_periods_1, name="ChargeRestrictionPeriod1"),
-            pd.Series(charge_periods_2, name="ChargeRestrictionPeriod2"),
             pd.Series(lookup_periods, name="LookupPeriod"),
         ]
         + [
@@ -462,14 +550,20 @@ def process_data_FIT(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         ],
         axis=1,
     )
-    data_tidy_df["ChargeRestrictionPeriod2_start"] = pd.to_datetime(
-        data_tidy_df["ChargeRestrictionPeriod2"].str.split("\s?-\s?", expand=True)[0],
-        format="%B %Y",
+
+    # Add 28AD index
+    data_tidy_df = data_tidy_df.set_index(index_28AD[3:])
+    # backfill 3 missing rows to match other levies
+    data_tidy_df = pd.concat(
+        [
+            pd.DataFrame(
+                np.full((3, len(data_tidy_df.columns)), np.nan),
+                columns=data_tidy_df.columns,
+            ).set_index(index_28AD[:3]),
+            data_tidy_df,
+        ]
     )
-    data_tidy_df["ChargeRestrictionPeriod2_end"] = pd.to_datetime(
-        data_tidy_df["ChargeRestrictionPeriod2"].str.split("\s?-\s?", expand=True)[1],
-        format="%B %Y",
-    )
+
     return data_tidy_df
 
 
@@ -660,21 +754,49 @@ def _tidy_tariff_table(
     pd.DataFrame
         Dataframing containing tariff component values for one fuel type-payment method in tidy format.
     """
-    # Tidy input data
-    tidy_df = input_df.melt(
-        id_vars=type_of_consumption, var_name="28AD_Charge_Restriction_Period"
+    # Transpose table to put 28ad charging period in the index
+    df = input_df.set_index(type_of_consumption).transpose().reset_index()
+    # Get starting period of the table
+    starting_period = pd.to_datetime(df.loc[0, "index"].split("-")[0])
+    # Get index starting point
+    try:
+        start_index = (
+            index_28AD.map(lambda idx: True if starting_period in idx[1] else False)
+            .to_numpy()
+            .nonzero()[0][0]
+        )
+    except IndexError:
+        raise IndexError("Could not match tariff start date with 28AD index.")
+    # set multi index
+    # Remove Jan 2019 record - this isn't used for tariffs.
+    drop_idx = (
+        index_28AD.map(
+            lambda idx: True if pd.to_datetime("2019-01") in idx[1] else False
+        )
+        .to_numpy()
+        .nonzero()[0][1]
     )
-    # Add start and end dates
-    with warnings.catch_warnings():
-        # Suppress warning for datetime parsing each element individually.
-        # Dates in this table are a mess and this is desired behaviour.
-        warnings.simplefilter("ignore")
-        tidy_df["28AD_Charge_Restriction_Period_start"] = pd.to_datetime(
-            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[0]
+    # Add index to table - dropping unneeded row and limiting to relevant period.
+    df = df.set_index(
+        index_28AD.drop(index_28AD[drop_idx])[start_index : start_index + df.shape[0]]
+    )
+
+    tidy_df = (
+        df.drop(columns="index")
+        .reset_index()
+        .melt(
+            id_vars=[
+                "28AD Charge Restriction Period 6 Month",
+                "28AD Charge Restriction Period 3 Month",
+            ]
         )
-        tidy_df["28AD_Charge_Restriction_Period_end"] = pd.to_datetime(
-            tidy_df["28AD_Charge_Restriction_Period"].str.split("-", expand=True)[1]
+        .set_index(
+            [
+                "28AD Charge Restriction Period 6 Month",
+                "28AD Charge Restriction Period 3 Month",
+            ]
         )
+    )
 
     return tidy_df
 

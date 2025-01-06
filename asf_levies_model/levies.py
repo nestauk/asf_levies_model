@@ -2,9 +2,10 @@ import copy
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
+import warnings
 
-from asf_levies_model.utils.utils import _generate_docstring
+from asf_levies_model.utils.utils import _generate_docstring, PriceCapPeriod
 
 
 class Levy:
@@ -34,6 +35,7 @@ class Levy:
             gas_fixed_rate: float [0, inf) the gas fixed rate for a levy.
             general_taxation: float [0, inf) the levy revenue passed to general taxation.
             revenue: float [0, inf) the total levy revenue.
+            price_cap_period: Interval indicating the price cap period the levy covers.
     """
 
     def __init__(
@@ -53,6 +55,7 @@ class Levy:
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
     ) -> None:
         """Initializes the instance based on provided levy parameters.
 
@@ -72,6 +75,7 @@ class Levy:
             gas_fixed_rate: Rate to calculate gas fixed cost (per customer or meter).
             general_taxation: Revenue abstracted to general taxation (absolute value).
             revenue: Total levy revenue (absolute value).
+            price_cap_period: Energy price cap period covered by the levy instance.
         """
         self.name = name
         self.short_name = short_name
@@ -96,6 +100,9 @@ class Levy:
 
         # revenue
         self.revenue = revenue
+
+        # price cap period
+        self.price_cap_period = price_cap_period
 
     def calculate_levy(
         self,
@@ -381,7 +388,7 @@ class Levy:
         ]
 
         return repr(
-            f'Levy(name="{self.name}", short_name="{self.short_name}", {", ".join([f"{attr}={getattr(self, attr)}" for attr in non_zero])})'
+            f'Levy(name="{self.name}", short_name="{self.short_name}", price_cap_period="{repr(self.price_cap_period)}", {", ".join([f"{attr}={getattr(self, attr)}" for attr in non_zero])})'
         )
 
     def __str__(self):
@@ -432,6 +439,7 @@ class RO(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         obligation_level: float,
@@ -455,6 +463,7 @@ class RO(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -465,21 +474,30 @@ class RO(Levy):
 
     @classmethod
     def from_dataframe(
-        cls, df: pd.DataFrame, revenue: float = None, denominator: float = None
+        cls,
+        df: pd.DataFrame,
+        revenue: float = None,
+        denominator: float = None,
+        price_cap: str = "LATEST",
     ) -> "RO":
         """Create RO levy instance from dataframe input.
 
         Uses the `process_data_RO()` output from `asf_levies_model.getters.load_data` to \
 initialise a RO levy object at present values.
 
-        As RO doesn't have a stated revenue or scheme cost, revenue must either be provided,\
+        As RO doesn't have a stated revenue or scheme cost, revenue must either be provided, \
 or a denominator in MWh given to calculate it from the levy value (£/MWh).
+
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
 
         Args:
             df: a dataframe with UpdateDate, SchemeYear, obligation_level,\
 BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fields.
             revenue: float, a total revenue amount (£) for the levy.
             denominator: float, a total supply amount (MWh) to calculate the revenue.
+            price_cap: str, price cap period to use; default: LATEST.
 
         Raises:
             ValueError: revenue or denominator must be provided.
@@ -487,17 +505,41 @@ BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fi
         if (revenue is None) & (denominator is None):
             raise ValueError("Please provide either revenue or denominator.")
 
-        # get latest ro values from df
-        latest = (
-            df.loc[lambda df: df["ObligationLevel"].notna()]
-            .sort_values("UpdateDate", ascending=False)
-            .iloc[0]
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df[["ObligationLevel", "BuyOutPriceSchemeYear"]]
+                .isna()
+                .all(axis=1)
+                .to_numpy()
+                .nonzero()[0][0]
+            )
+            df = df.iloc[latest_index - 1]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
         )
 
         ro_levy = cls.calculate_renewable_obligation_rate(
-            latest.ObligationLevel,
-            latest.BuyOutPriceSchemeYear,
-            latest.BuyOutPricePreviousYear,
+            df.ObligationLevel,
+            df.BuyOutPriceSchemeYear,
+            df.BuyOutPricePreviousYear,
         )
 
         if not revenue:
@@ -519,12 +561,13 @@ BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fi
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
-            UpdateDate=latest.UpdateDate,
-            SchemeYear=latest.SchemeYear,
-            obligation_level=latest.ObligationLevel,
-            BuyOutPriceSchemeYear=latest.BuyOutPriceSchemeYear,
-            BuyOutPricePreviousYear=latest.BuyOutPricePreviousYear,
-            ForecastAnnualRPIPreviousYear=latest.ForecastAnnualRPIPreviousYear,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            obligation_level=df.ObligationLevel,
+            BuyOutPriceSchemeYear=df.BuyOutPriceSchemeYear,
+            BuyOutPricePreviousYear=df.BuyOutPricePreviousYear,
+            ForecastAnnualRPIPreviousYear=df.ForecastAnnualRPIPreviousYear,
         )
 
     @staticmethod
@@ -582,6 +625,7 @@ class AAHEDC(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         TariffCurrentYear: float,
@@ -604,6 +648,7 @@ class AAHEDC(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -613,7 +658,11 @@ class AAHEDC(Levy):
 
     @classmethod
     def from_dataframe(
-        cls, df: pd.DataFrame, revenue: float = None, denominator: float = None
+        cls,
+        df: pd.DataFrame,
+        revenue: float = None,
+        denominator: float = None,
+        price_cap: str = "LATEST",
     ) -> "AAHEDC":
         """Create AAHEDC levy instance from dataframe input.
 
@@ -623,11 +672,16 @@ initialise an AAHEDC levy object at present values.
         As AAHEDC doesn't have a stated revenue or scheme cost, revenue must either be provided,\
 or a denominator in MWh given to calculate it from the levy value (£/MWh at GSP).
 
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
         Args:
             df: a dataframe with UpdateDate, SchemeYear, TariffCurrentYear,\
 TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
             revenue: float, a total revenue amount (£) for the levy.
             denominator: float, a total supply amount (MWh) to calculate the revenue.
+            price_cap: str, price cap period to use; default: LATEST.
 
         Raises:
             ValueError: revenue or denominator must be provided.
@@ -635,30 +689,43 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
         if (revenue is None) & (denominator is None):
             raise ValueError("Please provide either revenue or denominator.")
 
-        # get latest aahedc values from df
-        latest = (
-            df.assign(
-                tariff=lambda df: df.apply(
-                    lambda x: (
-                        x["TariffCurrentYear"]
-                        if not np.isnan(x["TariffCurrentYear"])
-                        else x["TariffPreviousYear"]
-                    ),
-                    axis=1,
-                )
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df[["TariffCurrentYear", "TariffPreviousYear"]]
+                .isna()
+                .all(axis=1)
+                .to_numpy()
+                .nonzero()[0][0]
             )
-            .loc[lambda df: df["tariff"].notna()]
-            .drop(columns="tariff")
-            .sort_values("UpdateDate", ascending=False)
-            .iloc[0]
-        )
+            df = df.iloc[latest_index - 1]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
 
         aahedc_tariff_forecast = cls.calculate_aahedc_tariff_forecast(
-            latest.TariffPreviousYear, latest.ForecastAnnualRPIPreviousYear
+            df.TariffPreviousYear, df.ForecastAnnualRPIPreviousYear
         )
 
         aahedc_levy = cls.calculate_aahedc_rate(
-            latest.TariffCurrentYear, aahedc_tariff_forecast
+            df.TariffCurrentYear, aahedc_tariff_forecast
+        )
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
         )
 
         if not revenue:
@@ -680,11 +747,12 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
-            UpdateDate=latest.UpdateDate,
-            SchemeYear=latest.SchemeYear,
-            TariffCurrentYear=latest.TariffCurrentYear,
-            TariffPreviousYear=latest.TariffPreviousYear,
-            ForecastAnnualRPIPreviousYear=latest.ForecastAnnualRPIPreviousYear,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            TariffCurrentYear=df.TariffCurrentYear,
+            TariffPreviousYear=df.TariffPreviousYear,
+            ForecastAnnualRPIPreviousYear=df.ForecastAnnualRPIPreviousYear,
         )
 
     @staticmethod
@@ -745,6 +813,7 @@ class GGL(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         LevyRate: float,
@@ -766,6 +835,7 @@ class GGL(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -774,7 +844,11 @@ class GGL(Levy):
 
     @classmethod
     def from_dataframe(
-        cls, df: pd.DataFrame, revenue: float = None, denominator: float = None
+        cls,
+        df: pd.DataFrame,
+        revenue: float = None,
+        denominator: float = None,
+        price_cap: str = "LATEST",
     ) -> "GGL":
         """Create GGL levy instance from dataframe input.
 
@@ -784,10 +858,15 @@ initialise a GGL levy object at present values.
         As GGL doesn't have a stated revenue or scheme cost, revenue must either be provided,\
 or a denominator (number of meters) given to calculate it from the levy value (£/meter).
 
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
         Args:
             df: a dataframe with UpdateDate, SchemeYear, LevyRate, BackdatedLevyRate fields.
             revenue: float, a total revenue amount (£) for the levy.
             denominator: float, a total number of meters (customers) to calculate the revenue.
+            price_cap: str, price cap period to use; default: LATEST.
 
         Raises:
             ValueError: revenue or denominator must be provided.
@@ -795,14 +874,33 @@ or a denominator (number of meters) given to calculate it from the levy value (�
         if (revenue is None) & (denominator is None):
             raise ValueError("Please provide either revenue or denominator.")
 
-        # get latest ggl values from df
-        latest = (
-            df.loc[lambda df: df["LevyRate"].notna()]
-            .sort_values("UpdateDate", ascending=False)
-            .iloc[0]
-        )
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = df["LevyRate"].notna().to_numpy().nonzero()[0].max()
 
-        ggl_levy = cls.calculate_ggl_rate(latest.LevyRate, latest.BackdatedLevyRate)
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
+
+        ggl_levy = cls.calculate_ggl_rate(df.LevyRate, df.BackdatedLevyRate)
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
 
         if not revenue:
             revenue = ggl_levy * denominator
@@ -823,10 +921,11 @@ or a denominator (number of meters) given to calculate it from the levy value (�
             gas_fixed_rate=ggl_levy,
             general_taxation=0,
             revenue=revenue,
-            UpdateDate=latest.UpdateDate,
-            SchemeYear=latest.SchemeYear,
-            LevyRate=latest.LevyRate,
-            BackdatedLevyRate=latest.BackdatedLevyRate,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            LevyRate=df.LevyRate,
+            BackdatedLevyRate=df.BackdatedLevyRate,
         )
 
     @staticmethod
@@ -884,6 +983,7 @@ class WHD(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         TargetSpendingForSchemeYear: float,
@@ -908,6 +1008,7 @@ class WHD(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -920,7 +1021,14 @@ class WHD(Levy):
         )
 
     @classmethod
-    def from_dataframe(cls, df, revenue=None, customers_gas=None, customers_elec=None):
+    def from_dataframe(
+        cls,
+        df,
+        revenue=None,
+        customers_gas=None,
+        customers_elec=None,
+        price_cap: str = "LATEST",
+    ):
         """Create WHD levy instance from dataframe input.
 
         Uses the `process_data_WHD()` output from `asf_levies_model.getters.load_data` to \
@@ -933,30 +1041,57 @@ value can also be provided if a different value is required.
 the ofgem spreadsheet doesn't provide sufficient information to calculate the effective gas and electric \
 shares. If customers_gas and customers_elec are provided the levy gets share information for the status quo levy.
 
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
         Args:
             df: a dataframe with UpdateDate, SchemeYear, TargetSpendingForSchemeYear, CoreSpending, \
 NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCoreGroup fields.
             revenue: float, a total revenue amount (£) for the levy.
             customers_gas: int [0, inf) annual gas customers (customer or meter count).
             customers_elec: int [0, inf) annual electricity customers (customer or meter count).
+            price_cap: str, price cap period to use; default: LATEST.
         """
         # get latest whd values from df
-        latest = (
-            df.loc[lambda df: df["TargetSpendingForSchemeYear"].notna()]
-            .sort_values("UpdateDate", ascending=False)
-            .iloc[0]
-        )
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df["TargetSpendingForSchemeYear"].notna().to_numpy().nonzero()[0].max()
+            )
+
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
 
         whd_levy = cls.calculate_whd_rate(
-            latest.TargetSpendingForSchemeYear,
-            latest.CoreSpending,
-            latest.NoncoreSpending,
-            latest.ObligatedSuppliersCustomerBase,
-            latest.CompulsorySupplierFractionOfCoreGroup,
+            df.TargetSpendingForSchemeYear,
+            df.CoreSpending,
+            df.NoncoreSpending,
+            df.ObligatedSuppliersCustomerBase,
+            df.CompulsorySupplierFractionOfCoreGroup,
+        )
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
         )
 
         if not revenue:
-            revenue = latest.TargetSpendingForSchemeYear
+            revenue = df.TargetSpendingForSchemeYear
 
         if customers_gas and customers_elec:
             gas_weight = customers_gas / (customers_gas + customers_elec)
@@ -981,13 +1116,14 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
             gas_fixed_rate=whd_levy,
             general_taxation=0,
             revenue=revenue,
-            UpdateDate=latest.UpdateDate,
-            SchemeYear=latest.SchemeYear,
-            TargetSpendingForSchemeYear=latest.TargetSpendingForSchemeYear,
-            CoreSpending=latest.CoreSpending,
-            NoncoreSpending=latest.NoncoreSpending,
-            ObligatedSuppliersCustomerBase=latest.ObligatedSuppliersCustomerBase,
-            CompulsorySupplierFractionOfCoreGroup=latest.CompulsorySupplierFractionOfCoreGroup,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            TargetSpendingForSchemeYear=df.TargetSpendingForSchemeYear,
+            CoreSpending=df.CoreSpending,
+            NoncoreSpending=df.NoncoreSpending,
+            ObligatedSuppliersCustomerBase=df.ObligatedSuppliersCustomerBase,
+            CompulsorySupplierFractionOfCoreGroup=df.CompulsorySupplierFractionOfCoreGroup,
         )
 
     @staticmethod
@@ -1067,6 +1203,7 @@ class ECO(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         UpdateDate: datetime,
         SchemeYear: str,
         AnnualisedCostECO4Gas: float,
@@ -1096,6 +1233,7 @@ class ECO(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
         self.UpdateDate = UpdateDate
         self.SchemeYear = SchemeYear
@@ -1115,7 +1253,9 @@ class ECO(Levy):
         self.ObligatedSupplierVolumeElectricity = ObligatedSupplierVolumeElectricity
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame, revenue: float = None) -> "ECO":
+    def from_dataframe(
+        cls, df: pd.DataFrame, revenue: float = None, price_cap: str = "LATEST"
+    ) -> "ECO":
         """Create ECO levy instance from dataframe input.
 
         Uses the `process_data_ECO()` output from `asf_levies_model.getters.load_data` to \
@@ -1123,6 +1263,10 @@ initialise an ECO levy object at present values.
 
         As ECO has stated scheme costs, these are used by default as the revenue, however a revenue \
 value can also be provided if a different value is required.
+
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
 
         Args:
             df: a dataframe with UpdateDate, SchemeYear, AnnualisedCostECO4Gas, \
@@ -1132,49 +1276,72 @@ FullyObligatedShareOfObligatedSupplierSupplyGas, \
 FullyObligatedShareOfObligatedSupplierSupplyElectricity, ObligatedSupplierVolumeGas, \
 ObligatedSupplierVolumeElectricity, fields.
             revenue: float, a total revenue amount (£) for the levy.
+            price_cap: str, price cap period to use; default: LATEST.
         """
         # get latest eco values from df
-        latest = (
-            df.loc[lambda df: df["AnnualisedCostECO4Gas"].notna()]
-            .sort_values("UpdateDate", ascending=False)
-            .iloc[0]
-        )
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df["AnnualisedCostECO4Gas"].notna().to_numpy().nonzero()[0].max()
+            )
+
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
 
         eco_levy_gas = cls.calculate_eco_rate(
-            latest.AnnualisedCostECO4Gas,
-            latest.AnnualisedCostGBISGas,
-            latest.GDPDeflatorToCurrentPricesECO4,
-            latest.GDPDeflatorToCurrentPricesGBIS,
-            latest.FullyObligatedShareOfObligatedSupplierSupplyGas,
-            latest.ObligatedSupplierVolumeGas,
+            df.AnnualisedCostECO4Gas,
+            df.AnnualisedCostGBISGas,
+            df.GDPDeflatorToCurrentPricesECO4,
+            df.GDPDeflatorToCurrentPricesGBIS,
+            df.FullyObligatedShareOfObligatedSupplierSupplyGas,
+            df.ObligatedSupplierVolumeGas,
         )
 
         eco_levy_elec = cls.calculate_eco_rate(
-            latest.AnnualisedCostECO4Electricity,
-            latest.AnnualisedCostGBISElectricity,
-            latest.GDPDeflatorToCurrentPricesECO4,
-            latest.GDPDeflatorToCurrentPricesGBIS,
-            latest.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
-            latest.ObligatedSupplierVolumeElectricity,
+            df.AnnualisedCostECO4Electricity,
+            df.AnnualisedCostGBISElectricity,
+            df.GDPDeflatorToCurrentPricesECO4,
+            df.GDPDeflatorToCurrentPricesGBIS,
+            df.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
+            df.ObligatedSupplierVolumeElectricity,
+        )
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
         )
 
         if not revenue:
             revenue = (
                 (
-                    latest.AnnualisedCostECO4Gas
-                    * (1 + latest.GDPDeflatorToCurrentPricesECO4 / 100)
+                    df.AnnualisedCostECO4Gas
+                    * (1 + df.GDPDeflatorToCurrentPricesECO4 / 100)
                 )
                 + (
-                    latest.AnnualisedCostECO4Electricity
-                    * (1 + latest.GDPDeflatorToCurrentPricesECO4 / 100)
+                    df.AnnualisedCostECO4Electricity
+                    * (1 + df.GDPDeflatorToCurrentPricesECO4 / 100)
                 )
                 + (
-                    latest.AnnualisedCostGBISGas
-                    * (1 + latest.GDPDeflatorToCurrentPricesGBIS / 100)
+                    df.AnnualisedCostGBISGas
+                    * (1 + df.GDPDeflatorToCurrentPricesGBIS / 100)
                 )
                 + (
-                    latest.AnnualisedCostGBISElectricity
-                    * (1 + latest.GDPDeflatorToCurrentPricesGBIS / 100)
+                    df.AnnualisedCostGBISElectricity
+                    * (1 + df.GDPDeflatorToCurrentPricesGBIS / 100)
                 )
             )
 
@@ -1194,18 +1361,19 @@ ObligatedSupplierVolumeElectricity, fields.
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
-            UpdateDate=latest.UpdateDate,
-            SchemeYear=latest.SchemeYear,
-            AnnualisedCostECO4Gas=latest.AnnualisedCostECO4Gas,
-            AnnualisedCostECO4Electricity=latest.AnnualisedCostECO4Electricity,
-            AnnualisedCostGBISGas=latest.AnnualisedCostGBISGas,
-            AnnualisedCostGBISElectricity=latest.AnnualisedCostGBISElectricity,
-            GDPDeflatorToCurrentPricesECO4=latest.GDPDeflatorToCurrentPricesECO4,
-            GDPDeflatorToCurrentPricesGBIS=latest.GDPDeflatorToCurrentPricesGBIS,
-            FullyObligatedShareOfObligatedSupplierSupplyGas=latest.FullyObligatedShareOfObligatedSupplierSupplyGas,
-            FullyObligatedShareOfObligatedSupplierSupplyElectricity=latest.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
-            ObligatedSupplierVolumeGas=latest.ObligatedSupplierVolumeGas,
-            ObligatedSupplierVolumeElectricity=latest.ObligatedSupplierVolumeElectricity,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            AnnualisedCostECO4Gas=df.AnnualisedCostECO4Gas,
+            AnnualisedCostECO4Electricity=df.AnnualisedCostECO4Electricity,
+            AnnualisedCostGBISGas=df.AnnualisedCostGBISGas,
+            AnnualisedCostGBISElectricity=df.AnnualisedCostGBISElectricity,
+            GDPDeflatorToCurrentPricesECO4=df.GDPDeflatorToCurrentPricesECO4,
+            GDPDeflatorToCurrentPricesGBIS=df.GDPDeflatorToCurrentPricesGBIS,
+            FullyObligatedShareOfObligatedSupplierSupplyGas=df.FullyObligatedShareOfObligatedSupplierSupplyGas,
+            FullyObligatedShareOfObligatedSupplierSupplyElectricity=df.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
+            ObligatedSupplierVolumeGas=df.ObligatedSupplierVolumeGas,
+            ObligatedSupplierVolumeElectricity=df.ObligatedSupplierVolumeElectricity,
         )
 
     @staticmethod
@@ -1249,9 +1417,7 @@ class FIT(Levy):
     __doc__ += (
         Levy.__doc__.split("\n", maxsplit=4)[4]
         + """\
-    ChargeRestrictionPeriod1: str, 28AD charge restriction period.
-        ChargeRestrictionPeriod2: str, 28AD charge restriction period.
-        LookupPeriod: str, year winter/summer lookup.
+    LookupPeriod: str, year winter/summer lookup.
         InflatedLevelisationFund: float, inflated Levelisation fund (£).
         TotalElectricitySupplied: float, total Electricity supplied (MWh).
         ExemptSupplyOutsideUK: float, exempt supply for renewable electricity from outside the UK (MWh).
@@ -1262,9 +1428,7 @@ class FIT(Levy):
     @_generate_docstring(
         Levy.__init__.__doc__,
         [
-            "    ChargeRestrictionPeriod1: 28AD charge restriction period.",
-            "            ChargeRestrictionPeriod2: 28AD charge restriction period.",
-            "            LookupPeriod: year winter/summer lookup.",
+            "    LookupPeriod: year winter/summer lookup.",
             "            InflatedLevelisationFund: inflated Levelisation fund (£).",
             "            TotalElectricitySupplied: total Electricity supplied (MWh).",
             "            ExemptSupplyOutsideUK: exempt supply for renewable electricity from outside the UK (MWh).",
@@ -1288,8 +1452,7 @@ class FIT(Levy):
         gas_fixed_rate: float,
         general_taxation: float,
         revenue: float,
-        ChargeRestrictionPeriod1: str,
-        ChargeRestrictionPeriod2: str,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
         LookupPeriod: str,
         InflatedLevelisationFund: float,
         TotalElectricitySupplied: float,
@@ -1312,9 +1475,8 @@ class FIT(Levy):
             gas_fixed_rate,
             general_taxation,
             revenue,
+            price_cap_period,
         )
-        self.ChargeRestrictionPeriod1 = ChargeRestrictionPeriod1
-        self.ChargeRestrictionPeriod2 = ChargeRestrictionPeriod2
         self.LookupPeriod = LookupPeriod
         self.InflatedLevelisationFund = InflatedLevelisationFund
         self.TotalElectricitySupplied = TotalElectricitySupplied
@@ -1323,7 +1485,11 @@ class FIT(Levy):
 
     @classmethod
     def from_dataframe(
-        cls, df: pd.DataFrame, revenue: float = None, scaling_factor: float = 1.0
+        cls,
+        df: pd.DataFrame,
+        revenue: float = None,
+        scaling_factor: float = 1.0,
+        price_cap: str = "LATEST",
     ) -> "FIT":
         """Create FIT levy instance from dataframe input.
 
@@ -1333,29 +1499,56 @@ initialise a FIT levy object at present values.
         As FIT has a stated scheme cost, this is used by default as the revenue, however a revenue \
 value can also be provided if a different value is required.
 
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
         Args:
             df: a dataframe with ChargeRestrictionPeriod1, ChargeRestrictionPeriod2, \
 LookupPeriod, InflatedLevelisationFund, TotalElectricitySupplied, ExemptSupplyOutsideUK, \
 ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fields.
             revenue: float, a total revenue amount (£) for the levy.
             scaling_factor: float, factor to scale total revenue amount (£) to reflect e.g. only domestic share.
+            price_cap: str, price cap period to use; default: LATEST.
         """
         # get latest fit values from df
-        latest = (
-            df.loc[lambda df: df["TotalElectricitySupplied"].notna()]
-            .sort_values("ChargeRestrictionPeriod2_start", ascending=False)
-            .iloc[0]
-        )
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df["TotalElectricitySupplied"].notna().to_numpy().nonzero()[0].max()
+            )
+
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
 
         fit_levy = cls.calculate_feed_in_tariff_rate(
-            latest.InflatedLevelisationFund,
-            latest.TotalElectricitySupplied,
-            latest.ExemptSupplyOutsideUK,
-            latest.ExemptSupplyEII,
+            df.InflatedLevelisationFund,
+            df.TotalElectricitySupplied,
+            df.ExemptSupplyOutsideUK,
+            df.ExemptSupplyEII,
+        )
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
         )
 
         if not revenue:
-            revenue = latest.InflatedLevelisationFund * scaling_factor
+            revenue = df.InflatedLevelisationFund * scaling_factor
         else:
             revenue *= scaling_factor
 
@@ -1375,13 +1568,12 @@ ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fi
             gas_fixed_rate=0,
             general_taxation=0,
             revenue=revenue,
-            ChargeRestrictionPeriod1=latest.ChargeRestrictionPeriod1,
-            ChargeRestrictionPeriod2=latest.ChargeRestrictionPeriod2,
-            LookupPeriod=latest.LookupPeriod,
-            InflatedLevelisationFund=latest.InflatedLevelisationFund,
-            TotalElectricitySupplied=latest.TotalElectricitySupplied,
-            ExemptSupplyOutsideUK=latest.ExemptSupplyOutsideUK,
-            ExemptSupplyEII=latest.ExemptSupplyEII,
+            price_cap_period=price_cap_period,
+            LookupPeriod=df.LookupPeriod,
+            InflatedLevelisationFund=df.InflatedLevelisationFund,
+            TotalElectricitySupplied=df.TotalElectricitySupplied,
+            ExemptSupplyOutsideUK=df.ExemptSupplyOutsideUK,
+            ExemptSupplyEII=df.ExemptSupplyEII,
         )
 
     @staticmethod
