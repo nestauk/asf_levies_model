@@ -510,10 +510,7 @@ BuyOutPriceSchemeYear, BuyOutPricePreviousYear, ForecastAnnualRPIPreviousYear fi
             latest_index = (
                 df[["ObligationLevel", "BuyOutPriceSchemeYear"]]
                 .isna()
-                .apply(
-                    lambda row: row["ObligationLevel"] & row["BuyOutPriceSchemeYear"],
-                    axis=1,
-                )
+                .all(axis=1)
                 .to_numpy()
                 .nonzero()[0][0]
             )
