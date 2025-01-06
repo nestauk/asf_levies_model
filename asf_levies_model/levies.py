@@ -695,8 +695,6 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
                 df[["TariffCurrentYear", "TariffPreviousYear"]]
                 .isna()
                 .all(axis=1)
-                    axis=1,
-                )
                 .to_numpy()
                 .nonzero()[0][0]
             )
