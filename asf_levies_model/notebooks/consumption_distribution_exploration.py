@@ -17,9 +17,13 @@
 
 # %%
 import pandas as pd
+import numpy as np
+from scipy.stats import norm
+from scipy.stats import lognorm
+from scipy.optimize import curve_fit
+import matplotlib.pyplot as plt
 
 from asf_levies_model.getters.load_data import ofgem_archetypes_data
-import matplotlib.pyplot as plt
 
 # %% [markdown]
 # Load consumption data and transform
@@ -119,55 +123,105 @@ electricity_profiles["Percentile"] = electricity_profiles["Percentile"] / 100
 
 
 # %% [markdown]
-# Exploring archetypes
+# Fitting distributions to archetype consumption
+
+
+# %% [markdown]
+# Normal distribution
 
 
 # %%
-def electricity_cdf(df: pd.DataFrame, archetype: str):
-    x = df[archetype][1:7]
-    y = df["Percentile"][1:7]
+def archetype_normal_fit(df: pd.DataFrame, archetype: str, fuel: str):
 
-    fig = plt.plot(
-        x,
-        y,
-        marker="o",
-        label=archetype,
+    # Normal distribution
+    fit_params_ppf, _fit_covariances = curve_fit(
+        lambda x, mu, sigma: norm(mu, sigma).ppf(x),
+        xdata=df["Percentile"][1:6],
+        ydata=df[archetype][1:6],
     )
 
-    plt.ylabel("Proportion")
-    plt.xlabel("Electricity consumption (kWh/year)")
-    plt.yticks(y)
-    plt.legend()
-    plt.grid()
+    # Extract fitted parameters
+    mu, sigma = fit_params_ppf
 
-    return fig
+    # Generate the fitted curve
+    x_fit = np.linspace(0.01, 0.99, 100)  # Percentiles
+    fit = norm(mu, sigma).ppf(x_fit)
 
+    # Plotting
+    f, ax = plt.subplots()
 
-# %%
-def gas_cdf(df: pd.DataFrame, archetype: str):
-    x = df[archetype][1:7]
-    y = df["Percentile"][1:7]
-
-    fig = plt.plot(
-        x,
-        y,
+    # Original data
+    ax.plot(
+        electricity_profiles["Percentile"],
+        electricity_profiles["A1"],
         marker="o",
-        label=archetype,
+        label="Original Data",
     )
 
-    plt.ylabel("Proportion")
-    plt.xlabel("Gas consumption (kWh/year)")
-    plt.yticks(y)
-    plt.legend()
+    # Fitted curve
+    ax.plot(
+        x_fit,
+        fit,
+        label=f"Fitted PPF (mu={mu:.2f}, sigma={sigma:.2f})",
+    )
+
+    # Customize plot
+    ax.set_ylabel(f"{fuel} consumption (kWh/year)")
+    ax.set_xlabel("Percentile")
     plt.grid()
+    ax.legend()
 
-    return fig
+
+# %%
+archetype_normal_fit(electricity_profiles, "A1", "electricity")
 
 
 # %%
-electricity_cdf(electricity_profiles, "A1")
+def archetype_lognormal_fit(df: pd.DataFrame, archetype: str, fuel: str):
+
+    # Lognormal distribution: curve fit for percentiles
+    fit_params_ppf, _fit_covariances = curve_fit(
+        lambda x, s, loc, scale: lognorm(s, loc, scale).ppf(x),
+        xdata=df["Percentile"][1:6],
+        ydata=df[archetype][1:6],
+        p0=[1, 0, df[archetype][1:6].mean()],  # Initial guess for [s, loc, scale]
+    )
+
+    # Extract fitted parameters
+    s, loc, scale = fit_params_ppf
+
+    # Generate the fitted curve
+    x_fit = np.linspace(0.01, 0.99, 100)  # Percentiles
+    fit = lognorm(s, loc, scale).ppf(x_fit)
+
+    # Plotting
+    f, ax = plt.subplots()
+
+    # Original data
+    ax.plot(
+        electricity_profiles["Percentile"],
+        electricity_profiles["A1"],
+        marker="o",
+        label="Original Data",
+    )
+
+    # Fitted curve
+    ax.plot(
+        x_fit,
+        fit,
+        label=f"Fitted Lognormal (s={s:.2f}, loc={loc:.2f}, scale={scale:.2f})",
+    )
+
+    # Customize plot
+    ax.set_ylabel(f"{fuel} consumption (kWh/year)")
+    ax.set_xlabel("Percentile")
+    plt.grid()
+    ax.legend()
+
 
 # %%
-gas_cdf(gas_profiles, "A1")
+archetype_lognormal_fit(electricity_profiles, "A1", "electricity")
+
+# %%
 
 # %%
