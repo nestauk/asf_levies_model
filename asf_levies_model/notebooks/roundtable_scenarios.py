@@ -17,6 +17,7 @@ from asf_levies_model.getters.load_data import (
     process_tariff_gas_other_payment_typical,
     ofgem_archetypes_data,
     ofgem_archetypes_scheme_eligibility,
+    ofgem_archetypes_net_income_deciles_full,
 )
 
 from asf_levies_model.levies import RO, AAHEDC, GGL, WHD, ECO, FIT
@@ -28,6 +29,7 @@ from asf_levies_model.summary import (
     create_scenario_weights_dict,
     calculate_cost_stream,
     set_common_denominators,
+    calculate_fuel_poverty_rates,
 )
 
 from asf_levies_model import config, PROJECT_DIR
@@ -549,6 +551,38 @@ for scenario_name in scenario_weights.keys():
         levy_rates_df = pd.concat([levy_rates_df, row])
 
 # %% [markdown]
+# **Electricity and gas prices**
+
+# %%
+prices_df = pd.DataFrame()
+
+for scenario_name in scenario_weights.keys():
+    row = pd.DataFrame(
+        [
+            {
+                "Scenario": scenario_name,
+                "Electricity standing charge (£/customer/year)": elec_tariffs[
+                    scenario_name
+                ].calculate_nil_consumption()
+                * 1.05,
+                "Electricity unit cost (£/MWh)": elec_tariffs[
+                    scenario_name
+                ].calculate_variable_consumption(1)
+                * 1.05,
+                "Gas standing charge (£/customer/year)": gas_tariffs[
+                    scenario_name
+                ].calculate_nil_consumption()
+                * 1.05,
+                "Gas unit cost (£/MWh)": gas_tariffs[
+                    scenario_name
+                ].calculate_variable_consumption(1)
+                * 1.05,
+            }
+        ]
+    )
+    prices_df = pd.concat([prices_df, row])
+
+# %% [markdown]
 #  **Saving all output dataframes to Excel workbook**
 
 # %%
@@ -574,6 +608,9 @@ with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
         writer, sheet_name="Scenario revenue streams", index=False
     )
     levy_rates_df.to_excel(writer, sheet_name="Scenario levy rates", index=False)
+    prices_df.to_excel(
+        writer, sheet_name="Scenario energy prices with VAT", index=False
+    )
     ofgem_archetypes_df.to_excel(
         writer, sheet_name="Underlying headline data", index=False
     )
