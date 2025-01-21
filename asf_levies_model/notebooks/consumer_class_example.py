@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -14,9 +15,6 @@
 #     language: python
 #     name: python3
 # ---
-
-# %% [markdown]
-# Setting up status quo levies and tariffs.
 
 # %%
 import pandas as pd
@@ -42,8 +40,13 @@ from asf_levies_model.tariffs import ElectricityOtherPayment, GasOtherPayment
 
 from asf_levies_model import config, PROJECT_DIR
 
+from asf_levies_model.consumers import Consumer
+
+# %% [markdown]
+# **Setting up Levy and Tariff objects**
+
 # %%
-# Set denominator values
+# Denominator values from Desnz subnational consumption domestic data
 supply_elec = 94_200_366
 supply_gas = 265_197_947
 customers_gas = 24_503_683
@@ -66,13 +69,18 @@ total_supply_elec = (
 exempt_eii_supply = 9_417_916  # Oct-Dec2024 period, Annex 4, New FIT methodology tab
 fit_scaling_factor = supply_elec / (total_supply_elec - exempt_eii_supply)
 
-# Annex 4 and initialise levies
+# %%
+# Initialise levies
 fileobject = download_annex_4(as_fileobject=True)
 levies = [
-    RO.from_dataframe(process_data_RO(fileobject), denominator=94_200_366),
-    AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=94_200_366),
-    GGL.from_dataframe(process_data_GGL(fileobject), denominator=24_503_683),
-    WHD.from_dataframe(process_data_WHD(fileobject)),
+    RO.from_dataframe(process_data_RO(fileobject), denominator=supply_elec),
+    AAHEDC.from_dataframe(process_data_AAHEDC(fileobject), denominator=supply_elec),
+    GGL.from_dataframe(process_data_GGL(fileobject), denominator=customers_gas),
+    WHD.from_dataframe(
+        process_data_WHD(fileobject),
+        customers_gas=customers_gas,
+        customers_elec=customers_elec,
+    ),
     ECO.from_dataframe(process_data_ECO(fileobject)),
     FIT.from_dataframe(
         process_data_FIT(fileobject),
@@ -81,7 +89,8 @@ levies = [
 ]
 fileobject.close()
 
-# Annex 9 and initialise tariffs (Other Payment method)
+# %%
+# Initialise tariffs (Other Payment method)
 fileobject = download_annex_9(as_fileobject=True)
 elec_other_payment_nil = process_tariff_elec_other_payment_nil(fileobject)
 elec_other_payment_typical = process_tariff_elec_other_payment_typical(fileobject)
@@ -89,7 +98,7 @@ gas_other_payment_nil = process_tariff_gas_other_payment_nil(fileobject)
 gas_other_payment_typical = process_tariff_gas_other_payment_typical(fileobject)
 fileobject.close()
 
-# Status quo - Rebalance baseline to reflect denominators
+# %%
 status_quo = {}  # Recreating status quo
 for levy in levies:
     status_quo[levy.short_name] = {
@@ -102,22 +111,19 @@ for levy in levies:
         "new_fixed_weight_gas": levy.gas_fixed_weight,
     }
 
-# manually update WHD weights according to denominator balance
-status_quo["whd"]["new_electricity_weight"] = denominators["whd"]["customers_elec"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
+# %%
+print(
+    f"From Ofgem: {sum([levy.calculate_levy(2.7, 11.5, True, True) for levy in levies])}"
 )
-
-status_quo["whd"]["new_gas_weight"] = denominators["whd"]["customers_gas"] / (
-    denominators["whd"]["customers_elec"] + denominators["whd"]["customers_gas"]
-)
-
-# rebalance baseline levies
 levies = [
     levy.rebalance_levy(
         **status_quo.get(levy.short_name), **denominators.get(levy.short_name)
     )
     for levy in levies
 ]
+print(
+    f"Rebalanced with our denominators: {sum([levy.calculate_levy(2.7, 11.5, True, True) for levy in levies])}"
+)
 
 # %%
 # Gas tariff
@@ -130,6 +136,7 @@ electricity_tariff = ElectricityOtherPayment.from_dataframe(
     elec_other_payment_nil, elec_other_payment_typical
 )
 
+# %%
 # Update baseline bill policy costs to match denominator adjusted policy costs
 gas_tariff.pc_nil = sum([levy.calculate_levy(0, 0, False, True) for levy in levies])
 gas_tariff.pc = sum([levy.calculate_levy(0, 1, False, False) for levy in levies])
@@ -141,18 +148,509 @@ electricity_tariff.pc = sum(
 )
 
 # %% [markdown]
+# **Setting up a Consumer object**
+
+# %% [markdown]
 # * We have `gas_tariff` and `electricity_tariff` objects that can be used to calculate the energy spend for a given consumer.
 # * We can use the standing charge and unit cost rates to calculate a bill for a single energy consumer.
 
 # %%
-from asf_levies_model.consumers import Consumer
+# Create a 'typical' consumer
+typical = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=False,
+)
+
+# %% [markdown]
+# There is a method to apply an adjustment to the final electricity or gas bill.
+
+# %% [markdown]
+# **Adjustment mode 1: Flat rebate**
+# * This mode substracts the specified discount value from the total fuel bill.
 
 # %%
-dummy_household = Consumer(
-    name="Dummy",
-    archetype="A1",
-    net_annual_income=10_000,
-    net_income_decile=4,
+# Check the subtotal bill for a typical consumer (this is the bill calculated based only on consumption)
+typical.electricity_subtotal_bill, typical.gas_subtotal_bill
+
+# %%
+# Check the final bill before applying support
+typical.electricity_bill, typical.gas_bill, typical.combined_fuel_bill
+
+# %%
+# Evaluate a flat support rate of £150 to electricity bills
+if typical.scheme_eligible:
+    typical = typical.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+# Get final bill
+# In this case there is no adjustment to the final bill as the consumer is not scheme eligible.
+typical.electricity_bill, typical.gas_bill, typical.combined_fuel_bill
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# %%
+# Check the subtotal bill for a typical consumer (this is the bill before support)
+# same as typical consumer
+typical_eligible.electricity_subtotal_bill, typical.gas_subtotal_bill
+
+# %%
+# Evaluate a flat support rate of £150 to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+# Get final bill
+# In this case there is an adjustment to the electricity bill
+typical_eligible.electricity_bill, typical_eligible.gas_bill
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %% [markdown]
+# Applying multiple flat rebates
+
+# %%
+# Apply another £150 discount to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+# Get final bill
+# In this case there is an £150 + £150 adjustment
+typical_eligible.electricity_bill, typical_eligible.gas_bill
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %% [markdown]
+# **Adjustment mode 2: Percentage discount**
+# * This mode subtracts a discount value (= percentage (%) of the *subtotal fuel bill*) from the total fuel bill.
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# %%
+# Evaluate a percentage discount support rate of 15% to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=15,
+        adjustment_mode="percentage discount",
+    )
+
+# %%
+# Get final bill
+# In this case there is an adjustment to the electricity bill
+typical_eligible.electricity_bill, typical_eligible.gas_bill
+
+# %%
+# Verifying a 15% discount was applied
+typical_eligible.electricity_subtotal_bill - (
+    0.15 * typical_eligible.electricity_subtotal_bill
+)
+
+# %% [markdown]
+# Applying another 10% discount on top
+
+# %%
+# Evaluate a percentage discount support rate of 10% to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=10,
+        adjustment_mode="percentage discount",
+    )
+
+# %%
+# Get new final bill
+typical_eligible.electricity_bill, typical_eligible.gas_bill
+
+# %%
+# Verifying that a 10% discount AND a 15% discount was applied
+(
+    typical_eligible.electricity_subtotal_bill
+    - (0.15 * typical_eligible.electricity_subtotal_bill)
+    - (0.10 * typical_eligible.electricity_subtotal_bill)
+)
+
+# %% [markdown]
+# **Adjustment mode: Unit discount**
+# * This mode subtracts a discount value = unit discount (£/MWh) * fuel consumption (MWh) from the total fuel bill.
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# %%
+# Evaluate a percentage discount support rate of £50/MWh (5p/kWh)
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=50,
+        adjustment_mode="unit discount",
+    )
+
+# Get final bill
+# In this case there is an adjustment to the electricity bill.
+typical_eligible.electricity_bill, typical_eligible.gas_bill
+
+# %%
+# Verifying discount
+typical_eligible.electricity_subtotal_bill - (typical.electricity_consumption * 50)
+
+# %% [markdown]
+# Applying an additional 50 £/MWh unit discount
+
+# %%
+# Evaluate a percentage discount support rate of £50/MWh (5p/kWh)
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=50,
+        adjustment_mode="unit discount",
+    )
+
+# Get final bill
+# In this case there is an adjustment to the electricity bill.
+typical_eligible.electricity_bill, typical_eligible.gas_bill
+
+# %%
+# Verifying discount
+(
+    typical_eligible.electricity_subtotal_bill
+    - (typical.electricity_consumption * 50)
+    - (typical.electricity_consumption * 50)
+)
+
+# %% [markdown]
+# **Applying different adjustment modes**
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# %% [markdown]
+# **Combination 1: Flat rebate + percentage discount**
+
+# %%
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+# Verify a £150 discount applied
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %% [markdown]
+# The new electricity bill for typical_eligible has now been discounted £150.
+
+# %% [markdown]
+# Let's add another layer of support: 10% discount
+# * This is implemented as applying another discount that is 10% of the subtotal electricity bill (i.e. bill before the flat rebate was applied)
+
+# %%
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=10,
+        adjustment_mode="percentage discount",
+    )
+
+# %% [markdown]
+# The new electricity bill now reflects two discounts:
+# * £150 discount
+# * 10% of the subtotal bill
+
+# %%
+# Verify a £150 discount AND 10% discount applied
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+150 + ((10 / 100) * typical_eligible.electricity_subtotal_bill)
+
+# %% [markdown]
+# When combining flat rebate and percentage discount, the order of operations does not matter and the total discount will be the same.
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# Apply % discount first
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=10,
+        adjustment_mode="percentage discount",
+    )
+
+# Apply flat rebate second
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+(typical_eligible.electricity_subtotal_bill * 0.1) + 150
+
+# %% [markdown]
+# **Combination 2: Flat rebate + unit discount**
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# %%
+# Apply another £150 discount to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+# Evaluate a percentage discount support rate of £50/MWh (5p/kWh)
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=50,
+        adjustment_mode="unit discount",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+150 + (typical_eligible.electricity_consumption * 50)
+
+# %% [markdown]
+# Order of operations also doesn't matter here.
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# Evaluate a percentage discount support rate of £50/MWh (5p/kWh)
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=50,
+        adjustment_mode="unit discount",
+    )
+
+# Apply another £150 discount to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %% [markdown]
+# **Combination 3: Percentage discount + unit discount**
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# Evaluate a percentage discount support rate of 10% to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=10,
+        adjustment_mode="percentage discount",
+    )
+
+# Evaluate a percentage discount support rate of £50/MWh (5p/kWh)
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=50,
+        adjustment_mode="unit discount",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+(typical_eligible.electricity_subtotal_bill * 0.1) + (
+    typical_eligible.electricity_consumption * 50
+)
+
+# %% [markdown]
+# Order of operations doesn't matter.
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# Evaluate a percentage discount support rate of £50/MWh (5p/kWh)
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=50,
+        adjustment_mode="unit discount",
+    )
+
+# Evaluate a percentage discount support rate of 10% to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=10,
+        adjustment_mode="percentage discount",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+(typical_eligible.electricity_consumption * 50) + (
+    typical_eligible.electricity_subtotal_bill * 0.1
+)
+
+# %% [markdown]
+# **Other calculated properties of a Consumer**
+
+# %%
+# Create a 'typical' consumer
+typical = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
     main_heating_fuel="gas",
     gas_consumption=11.5,
     electricity_consumption=2.7,
@@ -161,218 +659,58 @@ dummy_household = Consumer(
     unmetered_fuel_spend=0,
     scheme_eligible=False,
 )
-
-# %% [markdown]
-# Electricity and gas bill values are instance attributes.
-
-# %%
-dummy_household.electricity_bill
 
 # %% [markdown]
 # Fuel poverty gap calculation:
 # * If % of net income spent on fuel > 10% -> fuel poverty gap = (spending on fuel) - 0.1*(net annual income)
+# * where spending on fuel = electricity_bill + gas_bill + unmetered_fuel_spend
 # * This gap value is a calculated property
 
 # %%
-dummy_household.fuel_poverty_gap
+typical.fuel_poverty_gap
 
 # %% [markdown]
-# There is a method to apply an adjustment to the final electricity or gas bill
-# * Currently, adjustments are done to the subtotal bill (which is read-only and is calculated from consumption) so it is not possible to "layer" different adjustments on top of each other
+# Gap is zero because fuel spending is not above 10% of the household's net income
 
 # %%
-dummy_household.apply_social_support_adjustment(
-    adjustment_fuel="electricity",
-    adjustment_parameter=-150,
-    adjustment_mode="flat adjustment",
+(typical.combined_fuel_bill + typical.unmetered_fuel_spend) - (
+    typical.net_annual_income * 0.1
 )
-dummy_household.electricity_bill
-
-# %%
-dummy_household.apply_social_support_adjustment(
-    adjustment_fuel="electricity",
-    adjustment_parameter=15,
-    adjustment_mode="percentage discount",
-)
-dummy_household.electricity_bill
-
-# %%
-dummy_household.apply_social_support_adjustment(
-    adjustment_fuel="electricity",
-    adjustment_parameter=1,
-    adjustment_mode="unit discount",
-)
-dummy_household.electricity_bill
 
 # %% [markdown]
-# Demonstrating a way we could do a cross-subsidisation mechanism
+# Let's test that it works for a household that should have a non-zero fuel poverty gap
 
 # %%
-eligible_1 = Consumer(
-    name="Eligible household 1",
-    archetype="A1",
-    net_annual_income=10_000,
-    net_income_decile=4,
+dummy = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=20_000,
+    net_income_decile=5,
     main_heating_fuel="gas",
     gas_consumption=11.5,
     electricity_consumption=2.7,
     gas_tariff=gas_tariff,
     electricity_tariff=electricity_tariff,
-    unmetered_fuel_spend=0,
-    scheme_eligible=True,
-)
-
-eligible_2 = Consumer(
-    name="Eligible household 2",
-    archetype="A1",
-    net_annual_income=10_000,
-    net_income_decile=4,
-    main_heating_fuel="gas",
-    gas_consumption=12,
-    electricity_consumption=2,
-    gas_tariff=gas_tariff,
-    electricity_tariff=electricity_tariff,
-    unmetered_fuel_spend=0,
-    scheme_eligible=True,
-)
-
-ineligible_1 = Consumer(
-    name="Eligible household 1",
-    archetype="A1",
-    net_annual_income=10_000,
-    net_income_decile=4,
-    main_heating_fuel="gas",
-    gas_consumption=14,
-    electricity_consumption=3,
-    gas_tariff=gas_tariff,
-    electricity_tariff=electricity_tariff,
-    unmetered_fuel_spend=0,
-    scheme_eligible=False,
-)
-
-households = [eligible_1, eligible_2, ineligible_1]
-
-# %%
-for household in households:
-    if household.scheme_eligible:
-        rebate = -150
-        household.apply_social_support_adjustment(
-            adjustment_fuel="electricity",
-            adjustment_parameter=rebate,
-            adjustment_mode="flat adjustment",
-        )
-    else:
-        support = -(
-            rebate * sum(1 for x in households if x.scheme_eligible == True)
-        ) / sum(1 for x in households if x.scheme_eligible == False)
-        household.apply_social_support_adjustment(
-            adjustment_fuel="electricity",
-            adjustment_parameter=support,
-            adjustment_mode="flat adjustment",
-        )
-
-# %%
-eligible_1.electricity_subtotal_bill, eligible_1.electricity_bill
-
-# %%
-eligible_2.electricity_subtotal_bill, eligible_2.electricity_bill
-
-# %%
-ineligible_1.electricity_subtotal_bill, ineligible_1.electricity_bill
-
-# %% [markdown]
-# Electricity-to-gas unit cost ratio
-# - The unit cost ratio is a calculated property
-# - If a social support adjustment has been made via mode="unit discount" then the Consumer's unit cost ratio calculation will take the unit discount into account
-
-# %%
-dummy_household = Consumer(
-    name="Dummy",
-    archetype="A1",
-    net_annual_income=10_000,
-    net_income_decile=4,
-    main_heating_fuel="gas",
-    gas_consumption=11.5,
-    electricity_consumption=2.7,
-    gas_tariff=gas_tariff,
-    electricity_tariff=electricity_tariff,
-    unmetered_fuel_spend=0,
+    unmetered_fuel_spend=400,
     scheme_eligible=False,
 )
 
 # %%
-dummy_household.unit_cost_ratio
+dummy.fuel_poverty_gap
 
 # %%
-dummy_household.apply_social_support_adjustment(
-    adjustment_fuel="electricity",
-    adjustment_parameter=1,
-    adjustment_mode="unit discount",
+(dummy.combined_fuel_bill + dummy.unmetered_fuel_spend) - (
+    dummy.net_annual_income * 0.1
 )
-dummy_household.electricity_bill
-
-# %%
-# Unit cost ratio is calculated considering any unit discount
-dummy_household.unit_cost_ratio
-
-# %%
-dummy_household.apply_social_support_adjustment(
-    adjustment_fuel="electricity",
-    adjustment_parameter=-150,
-    adjustment_mode="flat adjustment",
-)
-dummy_household.electricity_bill
-
-# %%
-# Unit cost ratio is unaffected as adjustment_mode != "unit discount"
-dummy_household.unit_cost_ratio
 
 # %% [markdown]
 # Savings in running costs if switching from gas boiler to electric heat pump
 
 # %%
-dummy_household = Consumer(
-    name="Dummy",
-    archetype="A1",
-    net_annual_income=10_000,
-    net_income_decile=4,
-    main_heating_fuel="gas",
-    gas_consumption=11.5,
-    electricity_consumption=2.7,
-    gas_tariff=gas_tariff,
-    electricity_tariff=electricity_tariff,
-    unmetered_fuel_spend=0,
-    scheme_eligible=False,
-)
-
-# %%
-dummy_household.boiler_to_hp_savings()  # with default assumptions
+typical.boiler_to_hp_savings()  # with default assumptions
 
 # %% [markdown]
 # Creating a summary dataframe
 
 # %%
-dummy_household = Consumer(
-    name="Dummy",
-    archetype="A1",
-    net_annual_income=10_000,
-    net_income_decile=4,
-    main_heating_fuel="gas",
-    gas_consumption=11.5,
-    electricity_consumption=2.7,
-    gas_tariff=gas_tariff,
-    electricity_tariff=electricity_tariff,
-    unmetered_fuel_spend=0,
-    scheme_eligible=False,
-)
-
-# %%
-dummy_household.get_tidy_summary()
-
-# %%
-summary = pd.concat(
-    [dummy_household.get_tidy_summary(), eligible_1.get_tidy_summary()],
-)
-summary
-
-# %%
+typical.get_tidy_summary()
