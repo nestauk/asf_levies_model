@@ -1587,3 +1587,442 @@ ExemptSupplyEII, ChargeRestrictionPeriod2_start, ChargeRestrictionPeriod2_end fi
         return InflatedLevelisationFund / (
             TotalElectricitySupplied - ExemptSupplyOutsideUK - ExemptSupplyEII
         )
+
+
+class ECO4(Levy):
+    """Energy Company Obligation ECO4 Levy.\n"""
+
+    __doc__ += (
+        Levy.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+    UpdateDate: datetime, month and year ofgem data was updated.
+        SchemeYear: str, year of interest.
+        AnnualisedCostECO4Gas: float, annualised costs for scheme year attributed to gas - ECO4 (£).
+        AnnualisedCostECO4Electricity: float, annualised costs for scheme year attributed to electricity - ECO4 (£).
+        GDPDeflatorToCurrentPricesECO4: float, inflate annualised costs to current year prices (ECO4 costs are in 2021 prices, %).
+        FullyObligatedShareOfObligatedSupplierSupplyGas: float, share of supply volumes of all obligated suppliers accounted for by 'fully' obligated suppliers - gas (%).
+        FullyObligatedShareOfObligatedSupplierSupplyElectricity: float, share of supply volumes of all obligated suppliers accounted for by 'fully' obligated suppliers - electricity (%).
+        ObligatedSupplierVolumeGas: float, supply volumes of obligated suppliers - gas (MWh).
+        ObligatedSupplierVolumeElectricity: float, supply volumes of obligated suppliers - electricity (MWh).
+"""
+    )
+
+    @_generate_docstring(
+        Levy.__init__.__doc__,
+        [
+            "    UpdateDate: month and year of ofgem update.",
+            "            SchemeYear: year of interest.",
+            "            AnnualisedCostECO4Gas: annualised ECO4 costs for scheme year, gas.",
+            "            AnnualisedCostECO4Electricity: annualised ECO4 costs for scheme year, electricity.",
+            "            GDPDeflatorToCurrentPricesECO4: inflate ECO4 annualised costs (2021 prices) to current year prices.",
+            "            FullyObligatedShareOfObligatedSupplierSupplyGas: 'fully' obligated suppliers as a share of all obligated suppliers, gas.",
+            "            FullyObligatedShareOfObligatedSupplierSupplyElectricity: 'fully' obligated suppliers as a share of all obligated suppliers, electricity.",
+            "            ObligatedSupplierVolumeGas: supply volumes of obligated suppliers, gas.",
+            "            ObligatedSupplierVolumeElectricity: supply volumes of obligated suppliers, electricity.",
+        ],
+    )
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        electricity_weight: float,
+        gas_weight: float,
+        tax_weight: float,
+        electricity_variable_weight: float,
+        electricity_fixed_weight: float,
+        gas_variable_weight: float,
+        gas_fixed_weight: float,
+        electricity_variable_rate: float,
+        electricity_fixed_rate: float,
+        gas_variable_rate: float,
+        gas_fixed_rate: float,
+        general_taxation: float,
+        revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
+        UpdateDate: datetime,
+        SchemeYear: str,
+        AnnualisedCostECO4Gas: float,
+        AnnualisedCostECO4Electricity: float,
+        GDPDeflatorToCurrentPricesECO4: float,
+        FullyObligatedShareOfObligatedSupplierSupplyGas: float,
+        FullyObligatedShareOfObligatedSupplierSupplyElectricity: float,
+        ObligatedSupplierVolumeGas: float,
+        ObligatedSupplierVolumeElectricity: float,
+    ) -> None:
+        super(ECO4, self).__init__(
+            name,
+            short_name,
+            electricity_weight,
+            gas_weight,
+            tax_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
+            electricity_variable_rate,
+            electricity_fixed_rate,
+            gas_variable_rate,
+            gas_fixed_rate,
+            general_taxation,
+            revenue,
+            price_cap_period,
+        )
+        self.UpdateDate = UpdateDate
+        self.SchemeYear = SchemeYear
+        self.AnnualisedCostECO4Gas = AnnualisedCostECO4Gas
+        self.AnnualisedCostECO4Electricity = AnnualisedCostECO4Electricity
+        self.GDPDeflatorToCurrentPricesECO4 = GDPDeflatorToCurrentPricesECO4
+        self.FullyObligatedShareOfObligatedSupplierSupplyGas = (
+            FullyObligatedShareOfObligatedSupplierSupplyGas
+        )
+        self.FullyObligatedShareOfObligatedSupplierSupplyElectricity = (
+            FullyObligatedShareOfObligatedSupplierSupplyElectricity
+        )
+        self.ObligatedSupplierVolumeGas = ObligatedSupplierVolumeGas
+        self.ObligatedSupplierVolumeElectricity = ObligatedSupplierVolumeElectricity
+
+    @classmethod
+    def from_dataframe(
+        cls, df: pd.DataFrame, revenue: float = None, price_cap: str = "LATEST"
+    ) -> "ECO4":
+        """Create ECO4 levy instance from dataframe input.
+
+        Uses the `process_data_ECO()` output from `asf_levies_model.getters.load_data` to \
+initialise an ECO4 levy object at present values.
+
+        As ECO4 has stated scheme costs, these are used by default as the revenue, however a revenue \
+value can also be provided if a different value is required.
+
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
+        Args:
+            df: a dataframe with UpdateDate, SchemeYear, AnnualisedCostECO4Gas, \
+AnnualisedCostECO4Electricity, \
+GDPDeflatorToCurrentPricesECO4, \
+FullyObligatedShareOfObligatedSupplierSupplyGas, \
+FullyObligatedShareOfObligatedSupplierSupplyElectricity, ObligatedSupplierVolumeGas, \
+ObligatedSupplierVolumeElectricity, fields.
+            revenue: float, a total revenue amount (£) for the levy.
+            price_cap: str, price cap period to use; default: LATEST.
+        """
+        # get latest eco values from df
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df["AnnualisedCostECO4Gas"].notna().to_numpy().nonzero()[0].max()
+            )
+
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
+
+        eco4_levy_gas = cls.calculate_eco4_rate(
+            df.AnnualisedCostECO4Gas,
+            df.GDPDeflatorToCurrentPricesECO4,
+            df.FullyObligatedShareOfObligatedSupplierSupplyGas,
+            df.ObligatedSupplierVolumeGas,
+        )
+
+        eco4_levy_elec = cls.calculate_eco4_rate(
+            df.AnnualisedCostECO4Electricity,
+            df.GDPDeflatorToCurrentPricesECO4,
+            df.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
+            df.ObligatedSupplierVolumeElectricity,
+        )
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
+        if not revenue:
+            revenue = (
+                df.AnnualisedCostECO4Gas * (1 + df.GDPDeflatorToCurrentPricesECO4 / 100)
+            ) + (
+                df.AnnualisedCostECO4Electricity
+                * (1 + df.GDPDeflatorToCurrentPricesECO4 / 100)
+            )
+
+        return cls(
+            name="Energy Company Obligation, ECO4",
+            short_name="eco4",
+            electricity_weight=0.5,
+            gas_weight=0.5,
+            tax_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=1,
+            gas_fixed_weight=0,
+            electricity_variable_rate=eco4_levy_elec,
+            electricity_fixed_rate=0,
+            gas_variable_rate=eco4_levy_gas,
+            gas_fixed_rate=0,
+            general_taxation=0,
+            revenue=revenue,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            AnnualisedCostECO4Gas=df.AnnualisedCostECO4Gas,
+            AnnualisedCostECO4Electricity=df.AnnualisedCostECO4Electricity,
+            GDPDeflatorToCurrentPricesECO4=df.GDPDeflatorToCurrentPricesECO4,
+            FullyObligatedShareOfObligatedSupplierSupplyGas=df.FullyObligatedShareOfObligatedSupplierSupplyGas,
+            FullyObligatedShareOfObligatedSupplierSupplyElectricity=df.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
+            ObligatedSupplierVolumeGas=df.ObligatedSupplierVolumeGas,
+            ObligatedSupplierVolumeElectricity=df.ObligatedSupplierVolumeElectricity,
+        )
+
+    @staticmethod
+    def calculate_eco4_rate(
+        AnnualisedCostECO4: float,
+        GDPDeflatorToCurrentPricesECO4: float,
+        FullyObligatedShareOfObligatedSupplierSupply: float,
+        ObligatedSupplierVolume: float,
+    ):
+        """Calculate ECO4 levy rate from given values."""
+        if (not np.isnan(AnnualisedCostECO4)) & (
+            np.isnan(FullyObligatedShareOfObligatedSupplierSupply)
+        ):
+            rate = (
+                AnnualisedCostECO4 * (1 + GDPDeflatorToCurrentPricesECO4 / 100)
+            ) / ObligatedSupplierVolume
+        elif (not np.isnan(AnnualisedCostECO4)) & (
+            not np.isnan(FullyObligatedShareOfObligatedSupplierSupply)
+        ):
+            if np.isnan(GDPDeflatorToCurrentPricesECO4):
+                GDPDeflatorToCurrentPricesECO4 = 0
+            rate = (
+                (AnnualisedCostECO4 * FullyObligatedShareOfObligatedSupplierSupply)
+                * (1 + GDPDeflatorToCurrentPricesECO4 / 100)
+            ) / ObligatedSupplierVolume
+        else:
+            raise ValueError("Insufficient information to calculate ECO rate.")
+        return rate
+
+
+class GBIS(Levy):
+    """Energy Company Obligation Levy, GBIS. \n"""
+
+    __doc__ += (
+        Levy.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+    UpdateDate: datetime, month and year ofgem data was updated.
+        SchemeYear: str, year of interest.
+        AnnualisedCostGBISGas: float, annualised costs for scheme year attributed to gas - Great British Insulation Scheme (GBIS) - formally ECO+ (£).
+        AnnualisedCostGBISElectricity: float, annualised costs for scheme year attributed to electricity - Great British Insulation Scheme (GBIS) - formally ECO+ (£).
+        GDPDeflatorToCurrentPricesGBIS: float, inflate annualised costs to current year prices (ECO+/GBIS costs are in 2022 prices, %).
+        FullyObligatedShareOfObligatedSupplierSupplyGas: float, share of supply volumes of all obligated suppliers accounted for by 'fully' obligated suppliers - gas (%).
+        FullyObligatedShareOfObligatedSupplierSupplyElectricity: float, share of supply volumes of all obligated suppliers accounted for by 'fully' obligated suppliers - electricity (%).
+        ObligatedSupplierVolumeGas: float, supply volumes of obligated suppliers - gas (MWh).
+        ObligatedSupplierVolumeElectricity: float, supply volumes of obligated suppliers - electricity (MWh).
+"""
+    )
+
+    @_generate_docstring(
+        Levy.__init__.__doc__,
+        [
+            "    UpdateDate: month and year of ofgem update.",
+            "            SchemeYear: year of interest.",
+            "            AnnualisedCostGBISGas: annualised ECO+/GBIS costs for scheme year, gas.",
+            "            AnnualisedCostGBISElectricity: annualised ECO+/GBIS costs for scheme year, electricity.",
+            "            GDPDeflatorToCurrentPricesGBIS: inflate ECO+/GBIS annualised costs (2022 prices) to current year prices.",
+            "            FullyObligatedShareOfObligatedSupplierSupplyGas: 'fully' obligated suppliers as a share of all obligated suppliers, gas.",
+            "            FullyObligatedShareOfObligatedSupplierSupplyElectricity: 'fully' obligated suppliers as a share of all obligated suppliers, electricity.",
+            "            ObligatedSupplierVolumeGas: supply volumes of obligated suppliers, gas.",
+            "            ObligatedSupplierVolumeElectricity: supply volumes of obligated suppliers, electricity.",
+        ],
+    )
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        electricity_weight: float,
+        gas_weight: float,
+        tax_weight: float,
+        electricity_variable_weight: float,
+        electricity_fixed_weight: float,
+        gas_variable_weight: float,
+        gas_fixed_weight: float,
+        electricity_variable_rate: float,
+        electricity_fixed_rate: float,
+        gas_variable_rate: float,
+        gas_fixed_rate: float,
+        general_taxation: float,
+        revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
+        UpdateDate: datetime,
+        SchemeYear: str,
+        AnnualisedCostGBISGas: float,
+        AnnualisedCostGBISElectricity: float,
+        GDPDeflatorToCurrentPricesGBIS: float,
+        FullyObligatedShareOfObligatedSupplierSupplyGas: float,
+        FullyObligatedShareOfObligatedSupplierSupplyElectricity: float,
+        ObligatedSupplierVolumeGas: float,
+        ObligatedSupplierVolumeElectricity: float,
+    ) -> None:
+        super(GBIS, self).__init__(
+            name,
+            short_name,
+            electricity_weight,
+            gas_weight,
+            tax_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
+            electricity_variable_rate,
+            electricity_fixed_rate,
+            gas_variable_rate,
+            gas_fixed_rate,
+            general_taxation,
+            revenue,
+            price_cap_period,
+        )
+        self.UpdateDate = UpdateDate
+        self.SchemeYear = SchemeYear
+        self.AnnualisedCostGBISGas = AnnualisedCostGBISGas
+        self.AnnualisedCostGBISElectricity = AnnualisedCostGBISElectricity
+        self.GDPDeflatorToCurrentPricesGBIS = GDPDeflatorToCurrentPricesGBIS
+        self.FullyObligatedShareOfObligatedSupplierSupplyGas = (
+            FullyObligatedShareOfObligatedSupplierSupplyGas
+        )
+        self.FullyObligatedShareOfObligatedSupplierSupplyElectricity = (
+            FullyObligatedShareOfObligatedSupplierSupplyElectricity
+        )
+        self.ObligatedSupplierVolumeGas = ObligatedSupplierVolumeGas
+        self.ObligatedSupplierVolumeElectricity = ObligatedSupplierVolumeElectricity
+
+    @classmethod
+    def from_dataframe(
+        cls, df: pd.DataFrame, revenue: float = None, price_cap: str = "LATEST"
+    ) -> "GBIS":
+        """Create GBIS levy instance from dataframe input.
+
+        Uses the `process_data_ECO()` output from `asf_levies_model.getters.load_data` to \
+initialise an GBIS levy object at present values.
+
+        As GBIS has stated scheme costs, these are used by default as the revenue, however a revenue \
+value can also be provided if a different value is required.
+
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
+        Args:
+            df: a dataframe with UpdateDate, SchemeYear, \
+AnnualisedCostGBISGas, AnnualisedCostGBISElectricity, \
+GDPDeflatorToCurrentPricesGBIS, \
+FullyObligatedShareOfObligatedSupplierSupplyGas, \
+FullyObligatedShareOfObligatedSupplierSupplyElectricity, ObligatedSupplierVolumeGas, \
+ObligatedSupplierVolumeElectricity, fields.
+            revenue: float, a total revenue amount (£) for the levy.
+            price_cap: str, price cap period to use; default: LATEST.
+        """
+        # get latest eco values from df
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df["AnnualisedCostGBISGas"].notna().to_numpy().nonzero()[0].max()
+            )
+
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
+
+        gbis_levy_gas = cls.calculate_gbis_rate(
+            df.AnnualisedCostGBISGas,
+            df.GDPDeflatorToCurrentPricesGBIS,
+            df.FullyObligatedShareOfObligatedSupplierSupplyGas,
+            df.ObligatedSupplierVolumeGas,
+        )
+
+        gbis_levy_elec = cls.calculate_gbis_rate(
+            df.AnnualisedCostGBISElectricity,
+            df.GDPDeflatorToCurrentPricesGBIS,
+            df.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
+            df.ObligatedSupplierVolumeElectricity,
+        )
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
+        if not revenue:
+            revenue = (
+                df.AnnualisedCostGBISGas * (1 + df.GDPDeflatorToCurrentPricesGBIS / 100)
+            ) + (
+                df.AnnualisedCostGBISElectricity
+                * (1 + df.GDPDeflatorToCurrentPricesGBIS / 100)
+            )
+
+        return cls(
+            name="Energy Company Obligation, GBIS.",
+            short_name="gbis",
+            electricity_weight=0.5,
+            gas_weight=0.5,
+            tax_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=1,
+            gas_fixed_weight=0,
+            electricity_variable_rate=gbis_levy_elec,
+            electricity_fixed_rate=0,
+            gas_variable_rate=gbis_levy_gas,
+            gas_fixed_rate=0,
+            general_taxation=0,
+            revenue=revenue,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            AnnualisedCostGBISGas=df.AnnualisedCostGBISGas,
+            AnnualisedCostGBISElectricity=df.AnnualisedCostGBISElectricity,
+            GDPDeflatorToCurrentPricesGBIS=df.GDPDeflatorToCurrentPricesGBIS,
+            FullyObligatedShareOfObligatedSupplierSupplyGas=df.FullyObligatedShareOfObligatedSupplierSupplyGas,
+            FullyObligatedShareOfObligatedSupplierSupplyElectricity=df.FullyObligatedShareOfObligatedSupplierSupplyElectricity,
+            ObligatedSupplierVolumeGas=df.ObligatedSupplierVolumeGas,
+            ObligatedSupplierVolumeElectricity=df.ObligatedSupplierVolumeElectricity,
+        )
+
+    @staticmethod
+    def calculate_gbis_rate(
+        AnnualisedCostGBIS: float,
+        GDPDeflatorToCurrentPricesGBIS: float,
+        FullyObligatedShareOfObligatedSupplierSupply: float,
+        ObligatedSupplierVolume: float,
+    ):
+        """Calculate GBIS levy rate from given values."""
+        if not np.isnan(AnnualisedCostGBIS):
+            rate = (
+                (AnnualisedCostGBIS * (1 + GDPDeflatorToCurrentPricesGBIS / 100))
+            ) / ObligatedSupplierVolume
+        else:
+            raise ValueError("Insufficient information to calculate GBIS rate.")
+        return rate
