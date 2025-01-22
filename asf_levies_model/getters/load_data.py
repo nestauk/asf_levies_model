@@ -11,7 +11,7 @@ from io import BytesIO
 from os import listdir
 from requests.sessions import Session
 from requests import RequestException
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 from asf_levies_model import config, PROJECT_DIR
 
@@ -997,34 +997,50 @@ def process_tariff_gas_ppm_typical(
 
 
 def _ofgem_archetypes_dataset(descriptor: str) -> pd.DataFrame:
-    """General function to generate a dataframe with Ofgem archetype data from a pickle file."""
-    return pd.read_pickle(f"{ARCHETYPE_DATA_ROOT}archetypes_{descriptor}.pkl")
+    """Helper function to generate a dataframe with Ofgem archetype data from a .pkl file. The .pkl is a dictionary of dataframes with the following keys:
+    headline, scheme eligibility, equivalised income deciles, net income deciles, retired or pension, full data by net income decile, benefit recipients, in poverty.
+    """
+    master_df = pd.read_pickle(f"{ARCHETYPE_DATA_ROOT}master_archetypes_data.pkl")
+    return master_df[descriptor]
 
 
 def ofgem_archetypes_data() -> pd.DataFrame:
     """Pre-filled function to generate a dataframe with Ofgem archetype headline data."""
-    return _ofgem_archetypes_dataset("headline_data")
+    return _ofgem_archetypes_dataset("headline")
 
 
 def ofgem_archetypes_scheme_eligibility() -> pd.DataFrame:
-    """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households eligible for various schemes."""
-    return _ofgem_archetypes_dataset("scheme_eligibility")
+    """Pre-filled function to generate a dataframe with Ofgem archetype data on numberof households eligible for various schemes."""
+    return _ofgem_archetypes_dataset("scheme eligibility")
 
 
 def ofgem_archetypes_equivalised_income_deciles() -> pd.DataFrame:
     """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households in each OECD equivalised income decile."""
-    return _ofgem_archetypes_dataset("equiv_income_deciles")
+    return _ofgem_archetypes_dataset("equivalised income deciles")
 
 
 def ofgem_archetypes_net_income_deciles() -> pd.DataFrame:
     """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households in each net income decile."""
-    return _ofgem_archetypes_dataset("net_income_deciles")
+    return _ofgem_archetypes_dataset("net income deciles")
 
 
 def ofgem_archetypes_retired_pension() -> pd.DataFrame:
-    """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households with retired economic status or in receipt of pension guarantee/savings credit."""
-    return _ofgem_archetypes_dataset("retired_pension")
+    """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households with retired economic status or
+    in receipt of pension guarantee/savings credit."""
+    return _ofgem_archetypes_dataset("retired or pension")
 
 
 def ofgem_archetypes_net_income_deciles_full() -> pd.DataFrame:
-    return _ofgem_archetypes_dataset("net_income_deciles_full")
+    """Pre-filled function to generate a dataframe with Ofgem archetype detailed data on income, heating fuel, energy consumption, unmetered fuel spend
+    and number of households by archetype and income decile."""
+    return _ofgem_archetypes_dataset("full data by net income decile")
+
+
+def ofgem_archetypes_benefit_recipients() -> pd.DataFrame:
+    """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households in receipt of child benefit or universal credit."""
+    return _ofgem_archetypes_dataset("benefit recipients")
+
+
+def ofgem_archetypes_in_poverty() -> pd.DataFrame:
+    """Pre-filled function to generate a dataframe with Ofgem archetype data on number of households below the poverty line (income below 60% of median) after housing costs and before housing costs."""
+    return _ofgem_archetypes_dataset("in poverty")
