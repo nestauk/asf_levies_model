@@ -1599,7 +1599,6 @@ class ECO4(Levy):
         SchemeYear: str, year of interest.
         AnnualisedCostECO4Gas: float, annualised costs for scheme year attributed to gas - ECO4 (£).
         AnnualisedCostECO4Electricity: float, annualised costs for scheme year attributed to electricity - ECO4 (£).
-        AnnualisedCostGBISElectricity: float, annualised costs for scheme year attributed to electricity - Great British Insulation Scheme (GBIS) - formally ECO+ (£).
         GDPDeflatorToCurrentPricesECO4: float, inflate annualised costs to current year prices (ECO4 costs are in 2021 prices, %).
         GDPDeflatorToCurrentPricesGBIS: float, inflate annualised costs to current year prices (ECO+/GBIS costs are in 2022 prices, %).
         FullyObligatedShareOfObligatedSupplierSupplyGas: float, share of supply volumes of all obligated suppliers accounted for by 'fully' obligated suppliers - gas (%).
