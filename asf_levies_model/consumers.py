@@ -103,31 +103,6 @@ class Consumer:
         self._electricity_bill = None
         self._gas_bill = None
 
-        self._adjustment_mode = None
-
-    @property
-    def unit_cost_ratio(self) -> float:
-        if self._adjustment_mode == "unit discount":
-            unit_discount_electricity = (
-                self.electricity_subtotal_bill - self.electricity_bill
-            ) / self.electricity_consumption
-            unit_discount_gas = (
-                self.gas_subtotal_bill - self.gas_bill
-            ) / self.gas_consumption
-        else:
-            unit_discount_electricity = 0
-            unit_discount_gas = 0
-
-        if self.gas_consumption > 0:
-            ratio = (
-                self.electricity_tariff.calculate_variable_consumption(1)
-                - unit_discount_electricity
-            ) / (self.gas_tariff.calculate_variable_consumption(1) - unit_discount_gas)
-        else:
-            ratio = None
-
-        return ratio
-
     @property
     def fuel_poverty_gap(self) -> float:
         """Get the fuel poverty gap estimate.
@@ -243,9 +218,9 @@ class Consumer:
             Fuel bill to be adjusted, accepted strings are "electricity" and "gas".
         adjustment_parameter : float
             Value with which to adjust the fuel bill depending on adjustment mode. If adjustment mode is:
-            (a) flat adjustment: Value (£) to be added to the subtotal bill.
+            (a) flat adjustment: Value (£) to be added to the total bill.
             (b) percentage discount: Percentage (%) of subtotal bill to be subtracted.
-            (c) unit discount: Value (£/MWh) to be multiplied by fuel consumption, and product subtracted from the subtotal bill.
+            (c) unit discount: Value (£/MWh) to be multiplied by fuel consumption, and product subtracted from the total bill.
         adjustment_mode : str
             Acceptable strings are "flat adjustment", "percentage discount" and "unit discount".
         inplace : bool
@@ -268,7 +243,7 @@ class Consumer:
             )
 
         # Define lookup dictionaries
-        total_bill = {"electricity": "electricity_bill", "gas": "gas_bill"}
+        bill = {"electricity": self.electricity_bill, "gas": self.gas_bill}
         subtotal_bill = {
             "electricity": self.electricity_subtotal_bill,
             "gas": self.gas_subtotal_bill,
@@ -280,13 +255,13 @@ class Consumer:
 
         # Calculate adjusted total bills
         if adjustment_mode == "flat adjustment":
-            adjusted_bill = subtotal_bill[adjustment_fuel] + adjustment_parameter
+            adjusted_bill = bill[adjustment_fuel] + adjustment_parameter
         elif adjustment_mode == "percentage discount":
-            adjusted_bill = subtotal_bill[adjustment_fuel] * (
-                (100 - adjustment_parameter) / 100
+            adjusted_bill = bill[adjustment_fuel] - (
+                (adjustment_parameter / 100) * subtotal_bill[adjustment_fuel]
             )
         elif adjustment_mode == "unit discount":
-            adjusted_bill = subtotal_bill[adjustment_fuel] - (
+            adjusted_bill = bill[adjustment_fuel] - (
                 consumption[adjustment_fuel] * adjustment_parameter
             )
         else:
@@ -294,9 +269,9 @@ class Consumer:
                 "Please provide an adjustment mode from the following: flat adjustment, percentage_discount, unit discount"
             )
 
-        # Update attributes
+        # Update attribute
+        total_bill = {"electricity": "electricity_bill", "gas": "gas_bill"}
         setattr(obj, total_bill[adjustment_fuel], adjusted_bill)
-        obj._adjustment_mode = adjustment_mode
 
         # Return updated Consumer object if not inplace
         return None if inplace else obj
