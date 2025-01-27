@@ -379,6 +379,131 @@ typical_eligible.electricity_bill, typical_eligible.gas_bill
 )
 
 # %% [markdown]
+# **Adjustment mode: Rising block discount**
+# * This mode calculates discount based on varying unit discount rates for specific blocks of consumption units, and subtracts that discount from the total fuel bill.
+
+# %%
+# Create a 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    unmetered_fuel_spend=0,
+    scheme_eligible=True,
+)
+
+# %% [markdown]
+# Example discount structure:
+# - For units of electricity below 1 MWh, apply a unit discount of 50 £/MWh
+# - For units of electricity between 1-2 MWh, apply a unit discount of 30 £/MWh
+# - For units of electricity between 2-3 MWh, apply a unit discount of 10 £/MWh
+# - No discount applied for units of electricity above 3 MWh
+#
+# Note: All consumption thresholds are annual.
+
+# %%
+discount_structure = {
+    "thresholds": [1, 2, 3],
+    "discounts": [50, 30, 10],
+}
+
+# %%
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=discount_structure,
+        adjustment_mode="rising block",
+    )
+
+# %% [markdown]
+# With consumption = 2.7, we expect the following discount:
+# - (1 - 0) * 50 = 50
+# - (2 - 1) * 30 = 30
+# - (2.7 - 2) * 10 = 7
+# - Total = £87 discount
+
+# %%
+# Verify discount applied
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %% [markdown]
+# Applying an additional discount structure
+
+# %%
+discount_structure_additional = {
+    "thresholds": [1, 2, 3],
+    "discounts": [30, 20, 10],
+}
+
+# %%
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=discount_structure_additional,
+        adjustment_mode="rising block",
+    )
+
+# %% [markdown]
+# With consumption = 2.7, we expect the following discount:
+# - (1 - 0) * 30 = 30
+# - (2 - 1) * 20 = 20
+# - (2.7 - 2) * 10 = 7
+# - Total = £57 + £87 discount from first discount structure = £144
+
+# %%
+# Verify discount applied
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %% [markdown]
+# Checking that a discount structure with only 1 threshold works.
+
+# %%
+# Create a 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    unmetered_fuel_spend=0,
+    scheme_eligible=True,
+)
+
+# %%
+discount_structure = {
+    "thresholds": [2],
+    "discounts": [50],
+}
+
+# %% [markdown]
+# This translates to:
+# - First 2 MWh of consumption gets a discount of 50 £/MWh
+# - Over 2 MWh of consumption does not get a discount
+# - Total discount for 2.7 MWh electricity = 2 * 50 = £100
+
+# %%
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=discount_structure,
+        adjustment_mode="rising block",
+    )
+
+# %%
+# Verify discount applied
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %% [markdown]
 # **Applying different adjustment modes**
 
 # %%
@@ -640,6 +765,189 @@ typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
 (typical_eligible.electricity_consumption * 50) + (
     typical_eligible.electricity_subtotal_bill * 0.1
 )
+
+# %% [markdown]
+# **Combination 4: Percentage discount + rising block unit discount**
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# Evaluate a percentage discount support rate of 10% to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=10,
+        adjustment_mode="percentage discount",
+    )
+
+
+# Evaluate a rising block unit discount
+discount_structure = {
+    "thresholds": [1, 2, 3],
+    "discounts": [50, 30, 10],
+}
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=discount_structure,
+        adjustment_mode="rising block",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+(typical_eligible.electricity_subtotal_bill * 0.1) + (50 + 30 + 7)
+
+# %% [markdown]
+# Order of operations doesn't matter.
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# Evaluate a rising block unit discount
+discount_structure = {
+    "thresholds": [1, 2, 3],
+    "discounts": [50, 30, 10],
+}
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=discount_structure,
+        adjustment_mode="rising block",
+    )
+
+# Evaluate a percentage discount support rate of 10% to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=10,
+        adjustment_mode="percentage discount",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+(typical_eligible.electricity_subtotal_bill * 0.1) + (50 + 30 + 7)
+
+# %% [markdown]
+# **Combination 5: Flat rebate + rising block unit discount**
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+# Apply another £150 discount to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+
+# Evaluate a rising block unit discount
+discount_structure = {
+    "thresholds": [1, 2, 3],
+    "discounts": [50, 30, 10],
+}
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=discount_structure,
+        adjustment_mode="rising block",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+(150) + (50 + 30 + 7)
+
+# %% [markdown]
+# Order of operations also doesn't matter here.
+
+# %%
+# Create a scheme eligible 'typical' consumer
+typical_eligible = Consumer(
+    name="Typical",
+    archetype=None,
+    net_annual_income=35_464,
+    net_income_decile=5,
+    main_heating_fuel="gas",
+    gas_consumption=11.5,
+    electricity_consumption=2.7,
+    gas_tariff=gas_tariff,
+    electricity_tariff=electricity_tariff,
+    scheme_eligible=True,
+)
+
+
+# Evaluate a rising block unit discount
+discount_structure = {
+    "thresholds": [1, 2, 3],
+    "discounts": [50, 30, 10],
+}
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=discount_structure,
+        adjustment_mode="rising block",
+    )
+
+# Apply another £150 discount to electricity bills
+if typical_eligible.scheme_eligible:
+    typical_eligible = typical_eligible.apply_social_support_adjustment(
+        adjustment_fuel="electricity",
+        adjustment_parameter=-150,
+        adjustment_mode="flat adjustment",
+    )
+
+# %%
+typical_eligible.electricity_subtotal_bill - typical_eligible.electricity_bill
+
+# %%
+(150) + (50 + 30 + 7)
+
+# %% [markdown]
+# **Combination 6: Unit discount + rising block unit discount**
+# - This combination would not be applied as it is two forms of the same type of discount.
 
 # %% [markdown]
 # **Other calculated properties of a Consumer**
