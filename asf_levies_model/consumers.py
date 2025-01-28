@@ -1,6 +1,6 @@
 import pandas as pd
 import copy
-from typing import Optional
+from typing import Optional, Dict, Union
 
 from asf_levies_model.tariffs import Tariff
 
@@ -206,7 +206,7 @@ class Consumer:
     def apply_social_support_adjustment(
         self,
         adjustment_fuel: str,
-        adjustment_parameter: float,
+        adjustment_parameter: Union[float, Dict],
         adjustment_mode: str,
         inplace: bool = False,
     ) -> "Consumer | None":
@@ -216,13 +216,15 @@ class Consumer:
         ----------
         adjustment_fuel : str
             Fuel bill to be adjusted, accepted strings are "electricity" and "gas".
-        adjustment_parameter : float
+        adjustment_parameter : Union[float, Dict]
             Value with which to adjust the fuel bill depending on adjustment mode. If adjustment mode is:
             (a) flat adjustment: Value (£) to be added to the total bill.
             (b) percentage discount: Percentage (%) of subtotal bill to be subtracted.
             (c) unit discount: Value (£/MWh) to be multiplied by fuel consumption, and product subtracted from the total bill.
+            (d) rising block: Applies a varying unit discount for specified blocks of consumption units. Dictionary with keys "thresholds" and "discounts".
+                Value of "thresholds" and "discounts" keys must be provided as List[float].
         adjustment_mode : str
-            Acceptable strings are "flat adjustment", "percentage discount" and "unit discount".
+            Acceptable strings are "flat adjustment", "percentage discount", "unit discount" and "rising block".
         inplace : bool
             Make fuel bill change in place (True) or return copy (False), by default False.
 
@@ -264,9 +266,39 @@ class Consumer:
             adjusted_bill = bill[adjustment_fuel] - (
                 consumption[adjustment_fuel] * adjustment_parameter
             )
+        elif adjustment_mode == "rising block":
+
+            thresholds = adjustment_parameter["thresholds"]
+            discounts = adjustment_parameter["discounts"]
+
+            discount_amounts = []
+            for i in range(len(thresholds)):
+
+                # First block
+                if i == 0:
+                    applicable_units = min(consumption[adjustment_fuel], thresholds[i])
+
+                # Subsequent blocks
+                else:
+                    applicable_units = (
+                        min(consumption[adjustment_fuel], thresholds[i])
+                        - thresholds[i - 1]
+                    )
+
+                # Discount for applicable units in this block
+                if applicable_units > 0:
+                    discount_amounts.append(applicable_units * discounts[i])
+
+                # Stop loop if consumption is below current threshold
+                if consumption[adjustment_fuel] <= thresholds[i]:
+                    break
+
+            # Apply total discount to bill
+            adjusted_bill = bill[adjustment_fuel] - sum(discount_amounts)
+
         else:
             raise ValueError(
-                "Please provide an adjustment mode from the following: flat adjustment, percentage_discount, unit discount"
+                "Please provide an adjustment mode from the following: flat adjustment, percentage_discount, unit discount, rising block."
             )
 
         # Update attribute
