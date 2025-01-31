@@ -20,3 +20,11 @@ def _generate_docstring(inherited: str, new_params: list) -> Callable:
         return obj
 
     return inner
+
+
+def _dictionary_depth(d: dict) -> int:
+    """Convenience function to calculate the depth of a dictionary."""
+    if not isinstance(d, dict) or not d:
+        return 0
+    else:
+        return max(dictionary_depth(v) for k, v in d.iteritems()) + 1
