@@ -27,4 +27,4 @@ def _dictionary_depth(d: dict) -> int:
     if not isinstance(d, dict) or not d:
         return 0
     else:
-        return max(dictionary_depth(v) for k, v in d.iteritems()) + 1
+        return max(_dictionary_depth(v) for k, v in d.items()) + 1
