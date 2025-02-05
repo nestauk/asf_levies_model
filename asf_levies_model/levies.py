@@ -2485,6 +2485,45 @@ class LevyCollection:
                 denominators=self.denominators,
             )
 
+    def summarise_levies(self, include_weights: bool = False) -> pd.DataFrame:
+        """Output a summary of key levy statistics to a DataFrame.
+
+        Args:
+            include_weights: choose to include levy weights, defaults to False
+        """
+        desc_attrs = ["name", "short_name", "price_cap_period", "revenue"]
+        weight_attrs = [
+            "electricity_weight",
+            "gas_weight",
+            "tax_weight",
+            "electricity_variable_weight",
+            "electricity_fixed_weight",
+            "gas_variable_weight",
+            "gas_fixed_weight",
+        ]
+        rate_attrs = [
+            "electricity_variable_rate",
+            "electricity_fixed_rate",
+            "gas_variable_rate",
+            "gas_fixed_rate",
+            "general_taxation",
+        ]
+        if include_weights:
+            attrs = desc_attrs + weight_attrs + rate_attrs
+        else:
+            attrs = desc_attrs + rate_attrs
+
+        data = {
+            short_name: {attr: getattr(self[short_name], attr) for attr in attrs}
+            for short_name in self.levy_short_names
+        }
+
+        return (
+            pd.DataFrame(data)
+            .T.reset_index(drop=True)
+            .assign(price_cap_period=lambda df: df["price_cap_period"].map(repr))
+        )
+
     def _check_short_names_in_levies(self, short_names: List[str]) -> bool:
         """Check if a list of short names all appear in the LevyCollection."""
         return all([short_name in self.levy_short_names for short_name in short_names])
