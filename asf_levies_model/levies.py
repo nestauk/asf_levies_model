@@ -2053,6 +2053,12 @@ class LevyCollection:
             levies: List of Levy objects.
             denominators: A single set of denominators to apply to all levies, or a dictionary of levy specific denominators.
         """
+        # Ensure all levies have the same price cap period
+        if not all(
+            levy.price_cap_period == levies[0].price_cap_period for levy in levies
+        ):
+            raise ValueError("All levies must have the same price_cap_period")
+            
         self.name = name
         self.short_name = short_name
         self.levies = levies
