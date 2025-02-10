@@ -2,10 +2,14 @@ import copy
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, Union, Dict, List, Tuple
 import warnings
 
-from asf_levies_model.utils.utils import _generate_docstring, PriceCapPeriod
+from asf_levies_model.utils.utils import (
+    _generate_docstring,
+    PriceCapPeriod,
+    _dictionary_depth,
+)
 
 
 class Levy:
@@ -2026,3 +2030,558 @@ ObligatedSupplierVolumeElectricity, fields.
         else:
             raise ValueError("Insufficient information to calculate GBIS rate.")
         return rate
+
+
+class LevyCollection:
+    """A container for Levy objects.
+
+    Convenient abstraction for working with multiple levies.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        levies: list,
+        denominators: Union[Dict[str, int], Dict[str, Dict[str, int]]],
+    ) -> None:
+        """Initializes the Levy collection instance based on list of provided levies.
+
+        Args:
+            name: Name for LevyCollection instance.
+            short_name: Abbreviation for LevyCollection instance.
+            levies: List of Levy objects.
+            denominators: A single set of denominators to apply to all levies, or a dictionary of levy specific denominators.
+        """
+        # Ensure all levies have the same price cap period
+        if not all(
+            levy.price_cap_period == levies[0].price_cap_period for levy in levies
+        ):
+            raise ValueError("All levies must have the same price_cap_period")
+            
+        self.name = name
+        self.short_name = short_name
+        self.levies = levies
+        self.denominators = denominators
+
+    @property
+    def price_cap_period(self) -> PriceCapPeriod:
+        return self.levies[0].price_cap_period
+
+    @property
+    def levy_short_names(self) -> List[str]:
+        return [levy.short_name for levy in self.levies]
+
+    @property
+    def denominators(self):
+        return self._denominators
+
+    @denominators.setter
+    def denominators(self, denominator_values):
+        # If denominators dictonary has 1 level, assume it applies to all levies
+        if not any(isinstance(i, dict) for i in denominator_values.values()):
+            self._denominators = {
+                key: denominator_values for key in self.levy_short_names
+            }
+        # check all keys relate to levies in the collection.
+        elif self._check_levies_in_short_names(denominator_values.keys()):
+            self._denominators = denominator_values
+        else:
+            missing_keys = [
+                short_name
+                for short_name in self.levy_short_names
+                if short_name not in denominator_values.keys()
+            ]
+            raise ValueError(f"{missing_keys} keys missing from denominators.")
+
+    def rebalance_to_denominators(self, inplace=False):
+        """Rebalances supplied levies according to supplied denominators.
+
+        Useful for internal consistency if denominators differ from ofgem denominators.
+
+        Args:
+            inplace: bool, default is to return a new LevyCollection, but can be modified in place.
+        """
+        rebalancing_weights = {
+            levy.short_name: {
+                "new_electricity_weight": levy.electricity_weight,
+                "new_gas_weight": levy.gas_weight,
+                "new_tax_weight": levy.tax_weight,
+                "new_variable_weight_elec": levy.electricity_variable_weight,
+                "new_fixed_weight_elec": levy.electricity_fixed_weight,
+                "new_variable_weight_gas": levy.gas_variable_weight,
+                "new_fixed_weight_gas": levy.gas_fixed_weight,
+            }
+            for levy in self.levies
+        }
+
+        return self.rebalance_levies(
+            rebalancing_weights=rebalancing_weights,
+            scenario_name=f"{self.name}_rebalanced",
+            inplace=inplace,
+        )
+
+    def update_revenues(
+        self,
+        new_revenues: Dict[str, Union[float, int]],
+        overwrite: bool = True,
+        inplace: bool = False,
+    ) -> Optional["LevyCollection"]:
+        """Update levy revenues with new values.
+
+        The default (overwrite = True) sets a new_revenue as revenue and updates the levy rate using
+        the provided denominators.
+
+                If overwrite is set to False, the revenue is modified by new_revenue, a positive value
+        increases revenue (i.e. revenue = revenue + new_revenue), while a negative value decreases revenue
+        (i.e. revenue = revenue - new_revenue).
+
+        The new_revenues dictionary sets the levy short_name as the key and the new revenue as the value.
+
+        The method uses the LevyCollection denominators to re-estimate the levy rates.
+
+        args:
+            new_revenues: dict, levy short name: revenue value pairs to update.
+            overwrite: bool (default: True): whether to overwrite existing revenue with new_revenues or modify by new_revenues.
+            inplace: bool (default: False): whether to update Levy instance inplace or return new LevyCollection.
+        """
+        if not self._check_short_names_in_levies(new_revenues.keys()):
+            missing = self._get_short_names_not_in_levies(new_revenues.keys())
+            raise ValueError(
+                f"{', '.join(missing)} not recognised as a levy short name."
+            )
+
+        if inplace:
+            for key, value in new_revenues.items():
+                idx = [levy.short_name == key for levy in self.levies].index(True)
+                self.levies[idx].update_revenue(
+                    new_revenue=value,
+                    **self.denominators[key],
+                    overwrite=overwrite,
+                    inplace=inplace,
+                )
+            self.name = self.name + "_revenue_updated"
+        else:
+            levies = []
+            for levy in self.levies:
+                for key, value in new_revenues.items():
+                    if levy.short_name != key:
+                        levies.append(levy)
+                    elif levy.short_name == key:
+                        levies.append(
+                            levy.update_revenue(
+                                new_revenue=value,
+                                **self.denominators[key],
+                                overwrite=overwrite,
+                                inplace=inplace,
+                            )
+                        )
+                    else:
+                        raise ValueError("Error updating revenues.")
+            return LevyCollection(
+                name=self.name + "_revenue_updated",
+                short_name=self.short_name,
+                levies=levies,
+                denominators=self.denominators,
+            )
+
+    def union_levies(self, by: Optional[List[str]] = None) -> Levy:
+        """Collapse levies into single generic levy.
+
+        Args:
+            by: List of levy short names to union, defaults None (all levies).
+        """
+        if by:
+            if not self._check_short_names_in_levies(by):
+                bad_short_names = self._get_short_names_not_in_levies(by)
+                raise ValueError(
+                    f"{bad_short_names} passed to `by` not recognised as levy short names."
+                )
+        if not by:
+            by = self.levy_short_names
+
+        # Get revenue
+        total_revenue = sum(
+            [levy.revenue for levy in self.levies if levy.short_name in by]
+        )
+        gas_revenue = sum(
+            [
+                levy.revenue * levy.gas_weight
+                for levy in self.levies
+                if levy.short_name in by
+            ]
+        )
+        electricity_revenue = sum(
+            [
+                levy.revenue * levy.electricity_weight
+                for levy in self.levies
+                if levy.short_name in by
+            ]
+        )
+
+        # get combined rates
+        electricity_variable_rate = sum(
+            [
+                levy.electricity_variable_rate
+                for levy in self.levies
+                if levy.short_name in by
+            ]
+        )
+        electricity_fixed_rate = sum(
+            [
+                levy.electricity_fixed_rate
+                for levy in self.levies
+                if levy.short_name in by
+            ]
+        )
+        gas_variable_rate = sum(
+            [levy.gas_variable_rate for levy in self.levies if levy.short_name in by]
+        )
+        gas_fixed_rate = sum(
+            [levy.gas_fixed_rate for levy in self.levies if levy.short_name in by]
+        )
+
+        # get weights
+        gas_weight = (
+            sum(
+                [
+                    levy.revenue * levy.gas_weight
+                    for levy in self.levies
+                    if levy.short_name in by
+                ]
+            )
+            / total_revenue
+        )
+        electricity_weight = (
+            sum(
+                [
+                    levy.revenue * levy.electricity_weight
+                    for levy in self.levies
+                    if levy.short_name in by
+                ]
+            )
+            / total_revenue
+        )
+        tax_weight = (
+            sum(
+                [
+                    levy.revenue * levy.tax_weight
+                    for levy in self.levies
+                    if levy.short_name in by
+                ]
+            )
+            / total_revenue
+        )
+
+        electricity_variable_weight = (
+            sum(
+                [
+                    levy.revenue
+                    * levy.electricity_weight
+                    * levy.electricity_variable_weight
+                    for levy in self.levies
+                    if levy.short_name in by
+                ]
+            )
+            / electricity_revenue
+        )
+        electricity_fixed_weight = (
+            sum(
+                [
+                    levy.revenue
+                    * levy.electricity_weight
+                    * levy.electricity_fixed_weight
+                    for levy in self.levies
+                    if levy.short_name in by
+                ]
+            )
+            / electricity_revenue
+        )
+        gas_variable_weight = (
+            sum(
+                [
+                    levy.revenue * levy.gas_weight * levy.gas_variable_weight
+                    for levy in self.levies
+                    if levy.short_name in by
+                ]
+            )
+            / gas_revenue
+        )
+        gas_fixed_weight = (
+            sum(
+                [
+                    levy.revenue * levy.gas_weight * levy.gas_fixed_weight
+                    for levy in self.levies
+                    if levy.short_name in by
+                ]
+            )
+            / gas_revenue
+        )
+
+        return Levy(
+            name=f'union_{"_".join(by)}',
+            short_name="union",
+            electricity_weight=electricity_weight,
+            gas_weight=gas_weight,
+            tax_weight=tax_weight,
+            electricity_variable_weight=electricity_variable_weight,
+            electricity_fixed_weight=electricity_fixed_weight,
+            gas_variable_weight=gas_variable_weight,
+            gas_fixed_weight=gas_fixed_weight,
+            electricity_variable_rate=electricity_variable_rate,
+            electricity_fixed_rate=electricity_fixed_rate,
+            gas_variable_rate=gas_variable_rate,
+            gas_fixed_rate=gas_fixed_rate,
+            general_taxation=total_revenue * tax_weight,
+            revenue=total_revenue,
+            price_cap_period=self.price_cap_period,
+        )
+
+    def calculate_variable_levies(
+        self,
+        electricity_consumption: float,
+        gas_consumption: float,
+        by: Optional[List[str]] = None,
+    ) -> float:
+        """Calculate variable component of levies for given consumption.
+
+        Args:
+            electricity_consumption: float [0, inf), electricity consumption in MWh.
+            gas_consumption: float [0, inf), gas consumption in MWh.
+            by: List of levy short names to identify levies to use, defaults None (all levies).
+        """
+        if by:
+            if not self._check_short_names_in_levies(by):
+                bad_short_names = self._get_short_names_not_in_levies(by)
+                raise ValueError(
+                    f"{bad_short_names} passed to `by` not recognised as levy short names."
+                )
+        if not by:
+            by = self.levy_short_names
+
+        return sum(
+            [
+                levy.calculate_variable_levy(electricity_consumption, gas_consumption)
+                for levy in self.levies
+                if levy.short_name in by
+            ]
+        )
+
+    def calculate_fixed_levies(
+        self,
+        electricity_customer: bool,
+        gas_customer: bool,
+        by: Optional[List[str]] = None,
+    ) -> float:
+        """Calculate fixed component of levy for given customers.
+
+        Args:
+            electricity_customer: bool, whether electricity customer.
+            gas_customer: bool, whether gas customer.
+            by: List of levy short names to identify levies to use, defaults None (all levies).
+        """
+        if by:
+            if not self._check_short_names_in_levies(by):
+                bad_short_names = self._get_short_names_not_in_levies(by)
+                raise ValueError(
+                    f"{bad_short_names} passed to `by` not recognised as levy short names."
+                )
+        if not by:
+            by = self.levy_short_names
+
+        return sum(
+            [
+                levy.calculate_fixed_levy(electricity_customer, gas_customer)
+                for levy in self.levies
+                if levy.short_name in by
+            ]
+        )
+
+    def calculate_levies(
+        self,
+        electricity_consumption: float,
+        gas_consumption: float,
+        electricity_customer: bool,
+        gas_customer: bool,
+        by: Optional[List[str]] = None,
+    ) -> float:
+        """Calculate total levy amount (variable + fixed costs) for given consumer profile.
+
+        Args:
+            electricity_consumption: float [0, inf), electricity consumption in MWh.
+            gas_consumption: float [0, inf), gas consumption in MWh.
+            electricity_customer: bool, whether electricity customer.
+            gas_customer: bool, whether gas customer.
+            by: List of levy short names to identify levies to use, defaults None (all levies).
+        """
+        return self.calculate_variable_levies(
+            electricity_consumption, gas_consumption, by
+        ) + self.calculate_fixed_levies(electricity_customer, gas_customer, by)
+
+    def rebalance_levies(
+        self,
+        rebalancing_weights: Union[
+            Dict[str, Dict[str, float]], Dict[str, Dict[str, Dict[str, float]]]
+        ],
+        scenario_name: Optional[str] = None,
+        inplace: bool = False,
+    ) -> Optional["LevyCollection"]:
+        """Rebalance levies according to a set of rebalancing weights. Uses denominators held by LevyCollection.
+
+        Args:
+            rebalancing_weights: dict: weights to rebalance each levy, optionally indexed by scenario_name.
+            scenario_name: Optional[str]: scenario name, set as LevyCollection name.
+            inplace: bool: Default is to return a new LevyCollection, but can be modified in place.
+        """
+        # If rebalancing weights are not indexed by scenario, add a scenario level to dictionary.
+        if (
+            _dictionary_depth(rebalancing_weights) == 2
+        ) & self._check_levies_in_short_names(rebalancing_weights.keys()):
+            if scenario_name:
+                rebalancing_weights = {scenario_name: rebalancing_weights}
+            else:
+                scenario_name = "rebalancing_scenario"
+                rebalancing_weights = {scenario_name: rebalancing_weights}
+        # Otherwise check rebalancing weights exist for scenario.
+        elif (_dictionary_depth(rebalancing_weights) == 3) & (
+            scenario_name in rebalancing_weights.keys()
+        ):
+            if not self._check_levies_in_short_names(
+                rebalancing_weights.get(scenario_name).keys()
+            ):
+                raise ValueError(
+                    "Rebalancing weights need to cover all levies in the levy collection."
+                )
+        # Otherwise provide useful error handling.
+        else:
+            if (_dictionary_depth(rebalancing_weights) == 3) & (
+                scenario_name not in rebalancing_weights.keys()
+            ):
+                raise ValueError(
+                    "Rebalancing weights not available for given scenario name, or scenario name not provided."
+                )
+            elif (_dictionary_depth(rebalancing_weights) == 2) & (
+                not self._check_levies_in_short_names(rebalancing_weights.keys())
+            ):
+                raise ValueError(
+                    "Rebalancing weights need to cover all levies in the elvy collection."
+                )
+            else:
+                raise ValueError("Error with rebalancign weights. Please check form.")
+
+        # Rebalance levies
+        rebalanced_levies = [
+            levy.rebalance_levy(
+                **rebalancing_weights.get(scenario_name).get(levy.short_name),
+                **self.denominators.get(levy.short_name),
+            )
+            for levy in self.levies
+        ]
+
+        if inplace:
+            # update levies with rebalanced levies
+            self.levies = rebalanced_levies
+            self.name = scenario_name
+            return None
+        else:
+            return LevyCollection(
+                name=scenario_name,
+                short_name=self.short_name,
+                levies=rebalanced_levies,
+                denominators=self.denominators,
+            )
+
+    def summarise_levies(self, include_weights: bool = False) -> pd.DataFrame:
+        """Output a summary of key levy statistics to a DataFrame.
+
+        Args:
+            include_weights: choose to include levy weights, defaults to False
+        """
+        desc_attrs = ["name", "short_name", "price_cap_period", "revenue"]
+        weight_attrs = [
+            "electricity_weight",
+            "gas_weight",
+            "tax_weight",
+            "electricity_variable_weight",
+            "electricity_fixed_weight",
+            "gas_variable_weight",
+            "gas_fixed_weight",
+        ]
+        rate_attrs = [
+            "electricity_variable_rate",
+            "electricity_fixed_rate",
+            "gas_variable_rate",
+            "gas_fixed_rate",
+            "general_taxation",
+        ]
+        if include_weights:
+            attrs = desc_attrs + weight_attrs + rate_attrs
+        else:
+            attrs = desc_attrs + rate_attrs
+
+        data = {
+            short_name: {attr: getattr(self[short_name], attr) for attr in attrs}
+            for short_name in self.levy_short_names
+        }
+
+        return (
+            pd.DataFrame(data)
+            .T.reset_index(drop=True)
+            .assign(price_cap_period=lambda df: df["price_cap_period"].map(repr))
+        )
+
+    def _check_short_names_in_levies(self, short_names: List[str]) -> bool:
+        """Check if a list of short names all appear in the LevyCollection."""
+        return all([short_name in self.levy_short_names for short_name in short_names])
+
+    def _check_levies_in_short_names(self, short_names: List[str]) -> bool:
+        """Check if all LevyCollection levies appear in a list of short names."""
+        return all([short_name in short_names for short_name in self.levy_short_names])
+
+    def _get_short_names_not_in_levies(self, short_names: List[str]) -> bool:
+        """Return list of short names not in LevyCollection."""
+        return [
+            short_name
+            for short_name in short_names
+            if short_name not in self.levy_short_names
+        ]
+
+    def copy(self, deep: bool = True):
+        """Return a copy of the LevyCollection."""
+        if deep:
+            return copy.deepcopy(self)
+        else:
+            return copy.copy(self)
+
+    def __getitem__(self, key: Union[str, List[str], Tuple[str]]):
+        """Index LevyCollection based on Levy short names."""
+        if isinstance(key, str):
+            if key in self.levy_short_names:
+                return [levy for levy in self.levies if levy.short_name == key][0]
+            else:
+                raise IndexError(f"{key} not found in levy short names.")
+        elif isinstance(key, list) or isinstance(key, tuple):
+            if all([k in self.levy_short_names for k in key]):
+                return [levy for levy in self.levies if levy.short_name in key]
+            else:
+                missing = [k for k in key if k not in self.levy_short_names]
+                raise IndexError(f"{', '.join(missing)} not found in levy short names.")
+
+    def __setitem__(self, key, value):
+        raise NotImplementedError()
+
+    def __delitem__(self, key):
+        if key in self.levy_short_names:
+            self.levies = [levy for levy in self.levies if levy.short_name != key]
+
+    def __iter__(self):
+        yield from self.levies
+
+    def __len__(self):
+        return len(self.levies)
+
+    def __str__(self):
+        return f"LevyCollection containing: {', '.join(self.levy_short_names)} levies."
+
+    def __repr__(self):
+        return self.__str__()

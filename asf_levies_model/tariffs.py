@@ -1,6 +1,8 @@
 import pandas as pd
-from typing import Union
+import copy
+from typing import Union, Optional
 
+from asf_levies_model.levies import LevyCollection
 from asf_levies_model.utils.utils import PriceCapPeriod
 
 
@@ -193,6 +195,48 @@ use the calculate_nil_consumption method.
             (self.calculate_nil_consumption() if consumption > 0 else 0)
             + self.calculate_variable_consumption(consumption)
         ) * (1.05 if vat else 1.0)
+
+    def update_policy_costs(
+        self, levy_collection: LevyCollection, inplace: bool = False
+    ) -> Optional["Tariff"]:
+        """Updates the policy costs pc and pc_nil according to passed LevyCollection.
+
+        Args:
+            levy_collection: LevyCollection to use for updating.
+            inplace: Whether to update in place, default False.
+        """
+        if inplace:
+            if self.fuel == "electricity":
+                self.pc_nil = levy_collection.calculate_fixed_levies(True, False)
+                self.pc = levy_collection.calculate_variable_levies(1.0, 0.0)
+            elif self.fuel == "gas":
+                self.pc_nil = levy_collection.calculate_fixed_levies(False, True)
+                self.pc = levy_collection.calculate_variable_levies(0.0, 1.0)
+            else:
+                raise ValueError(
+                    f"Can't update policy costs where fuel is: {self.fuel}, fuel expected to be 'gas' or 'electricity'."
+                )
+            return None
+        else:
+            new_tariff = self.copy(deep=True)
+            if self.fuel == "electricity":
+                new_tariff.pc_nil = levy_collection.calculate_fixed_levies(True, False)
+                new_tariff.pc = levy_collection.calculate_variable_levies(1.0, 0.0)
+            elif self.fuel == "gas":
+                new_tariff.pc_nil = levy_collection.calculate_fixed_levies(False, True)
+                new_tariff.pc = levy_collection.calculate_variable_levies(0.0, 1.0)
+            else:
+                raise ValueError(
+                    f"Can't update policy costs where fuel is: {self.fuel}, fuel expected to be 'gas' or 'electricity'."
+                )
+            return new_tariff
+
+    def copy(self, deep: bool = True) -> "Tariff":
+        """Create copy of self."""
+        if deep:
+            return copy.deepcopy(self)
+        else:
+            return copy.copy(self)
 
     def __str__(self):
         """String representation of tariff name."""
