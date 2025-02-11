@@ -54,7 +54,6 @@ class Consumer:
         electricity_tariff: Tariff,
         unmetered_fuel_spend: float = 0.0,
         scheme_eligible: bool = False,
-        size: int = 0,
     ) -> None:
         """Initalizes a Consumer instance based on provided parameters.
 
@@ -82,8 +81,6 @@ class Consumer:
             Annual amount spent on unmetered fuel (i.e., fuel that is not gas or electricity), in £, by default 0.
         scheme_eligible : bool, optional
             Eligibilty for social support scheme, by default False.
-        size : int, optional
-            Number of households in consumer profile, by default 0 (i.e. size is not considered).
         """
 
         self.name = name
@@ -95,7 +92,6 @@ class Consumer:
         self.electricity_consumption = electricity_consumption
         self.scheme_eligible = scheme_eligible
         self.unmetered_fuel_spend = unmetered_fuel_spend
-        self.size = size
 
         self.electricity_tariff = electricity_tariff
         self.gas_tariff = gas_tariff
@@ -319,7 +315,7 @@ class Consumer:
         attributes = [
             (key, value)
             for key, value in self.__dict__.items()
-            if key != "name" and not key.startswith("_")
+            if key != "name" and not key.startswith("_") and key != "scheme_eligible"
         ]
         properties = [
             (key, getattr(self, key))
@@ -329,7 +325,8 @@ class Consumer:
         attributes.extend(properties)
         df = pd.DataFrame(attributes, columns=["Attribute", "Value"])
         df["Name"] = self.name
-        return df[["Name", "Attribute", "Value"]]
+        df["Eligible for support"] = self.scheme_eligible
+        return df[["Name", "Eligible for support", "Attribute", "Value"]]
 
     @classmethod
     def consumer_from_dataframe(
@@ -346,9 +343,8 @@ class Consumer:
         electricity_tariff: Tariff,
         net_income_decile_col: Optional[str] = None,
         unmetered_fuel_spend_col: Optional[str] = None,
-        scheme_eligible_col: Optional[str] = None,
-        size_col: Optional[str] = None,
         unit_converter: float = 1.0,
+        eligible: bool = False,
     ) -> "Consumer":
         """Creates a Consumer instance from dataframe input.
 
@@ -378,12 +374,10 @@ class Consumer:
             Name of the dataframe column with income decile (int), by default None.
         unmetered_fuel_spend_col : str, optional
             Name of the dataframe column with annual unmetered fuel spend amount (float), by default None.
-        scheme_eligible_col : str, optional
-            Name of the dataframe column with scheme eligibility (bool), by default None.
-        size_col : str, optional
-            Name of the dataframe column with the number of households in consumer profile if being considered, by default 0.
         unit_converter : float, optional
             Value to divide electricity and gas consumption values from dataframe by to convert to MWh, by default 1.
+        eligible : bool, by default False
+            If True, Consumer is to have scheme_eligibility = True.
 
         Returns
         -------
@@ -402,8 +396,6 @@ class Consumer:
         )
         net_income_decile = row_of_interest.get(net_income_decile_col, None)
         unmetered_fuel_spend = row_of_interest.get(unmetered_fuel_spend_col, 0)
-        scheme_eligible = row_of_interest.get(scheme_eligible_col, False)
-        size = row_of_interest.get(size_col, 0)
 
         return cls(
             name=name,
@@ -414,8 +406,7 @@ class Consumer:
             gas_consumption=gas_consumption,
             electricity_consumption=electricity_consumption,
             unmetered_fuel_spend=unmetered_fuel_spend,
-            scheme_eligible=scheme_eligible,
-            size=size,
+            scheme_eligible=eligible,
             gas_tariff=gas_tariff,
             electricity_tariff=electricity_tariff,
         )
@@ -470,3 +461,235 @@ for heating and hot water to an electric heat pump. Values are exclusive of VAT.
         )
 
         return hp_running_cost - boiler_running_cost
+
+
+class ConsumerCollection:
+    """A container for Consumer objects."""
+
+    def __init__(
+        self,
+        name: str,
+        consumers: list[Consumer],
+        group_sizes: Optional[Dict[str, Dict[bool, int]]] = None,
+    ) -> None:
+        """Initializes a ConsumerCollection instance based on a list of provided Consumer objects.
+
+        Parameters
+        ----------
+        name : str
+            Name for ConsumerCollection instance
+        consumers : list
+            List of Consumer objects
+        group_sizes : Optional[Dict], optional
+            Dictionary acting as a look-up for number of households represented by each consumer object in collection, by default None
+        """
+
+        self.name = name
+        self.consumers = consumers
+
+        if not group_sizes:
+            group_sizes = {consumer.name: 1 for consumer in self.consumers}
+        self.group_sizes = group_sizes
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        collection_name: str,
+        df: pd.DataFrame,
+        rows: Union[list[int], range],
+        name_col: str,
+        archetype_col: str,
+        net_annual_income_col: str,
+        main_heating_fuel_col: str,
+        gas_consumption_col: str,
+        electricity_consumption_col: str,
+        gas_tariff: Tariff,
+        electricity_tariff: Tariff,
+        net_income_decile_col: Optional[str] = None,
+        unmetered_fuel_spend_col: Optional[str] = None,
+        unit_converter: float = 1.0,
+        model_eligibility_sets: bool = True,
+    ) -> "ConsumerCollection":
+        """_summary_
+
+        Parameters
+        ----------
+        collection_name : str
+            Name of ConsumerCollection to be instantiated.
+        df : pd.DataFrame
+            Dataframe where each row corresponds to a consumer profile and columns describe (at least) name, net annual, income, main heating fuel, annual gas consumption, annual electricity consumption.
+        rows : list or range
+            Row indices in dataframe for consumer profile to instantiate.
+        name_col : str
+            Name of the dataframe column with unique consumer name (str).
+        archetype_col : str
+           Name of the dataframe column with consumer profile category (str).
+        net_annual_income_col : str
+            Name of the dataframe column with net annual income amount (float).
+        main_heating_fuel_col : str
+            Name of the dataframe column with main heating fuel description (str).
+        gas_consumption_col : str
+            Name of the dataframe column with annual gas consumption amount (float).
+        electricity_consumption_col : str
+            Name of the dataframe column with annual electricity consumption amount (float).
+        gas_tariff : Tariff
+            Gas tariff object for consumer bill to be calculated with.
+        electricity_tariff : Tariff
+            Electricity tariff object for consumer bill to be calculated with.
+        net_income_decile_col : Optional[str], optional
+            Name of the dataframe column with income decile (int), by default None.
+        unmetered_fuel_spend_col : Optional[str], optional
+            Name of the dataframe column with annual unmetered fuel spend amount (float), by default None.
+        unit_converter : float, optional
+            Value to divide electricity and gas consumption values from dataframe by to convert to MWh, by default 1.0.
+        model_eligibility_sets : bool, optional
+            If True, ConsumerCollection will be populated with two sets of identical Consumer objects but one set with scheme_eligibility=True and one set scheme_eligibility=False, by default True
+
+        Returns
+        -------
+        ConsumerCollection
+            ConsumerCollection instance.
+        """
+
+        # Always create ineligible consumers.
+        consumers = [
+            Consumer.consumer_from_dataframe(
+                df=df,
+                row=row,
+                name_col=name_col,
+                archetype_col=archetype_col,
+                net_annual_income_col=net_annual_income_col,
+                net_income_decile_col=net_income_decile_col,
+                main_heating_fuel_col=main_heating_fuel_col,
+                gas_consumption_col=gas_consumption_col,
+                electricity_consumption_col=electricity_consumption_col,
+                unmetered_fuel_spend_col=unmetered_fuel_spend_col,
+                gas_tariff=gas_tariff,
+                electricity_tariff=electricity_tariff,
+                unit_converter=unit_converter,
+                eligible=False,
+            )
+            for row in rows
+        ]
+
+        if model_eligibility_sets:
+            # create eligible consumers if you need them.
+            eligible_consumers = [
+                Consumer.consumer_from_dataframe(
+                    df=df,
+                    row=row,
+                    name_col=name_col,
+                    archetype_col=archetype_col,
+                    net_annual_income_col=net_annual_income_col,
+                    net_income_decile_col=net_income_decile_col,
+                    main_heating_fuel_col=main_heating_fuel_col,
+                    gas_consumption_col=gas_consumption_col,
+                    electricity_consumption_col=electricity_consumption_col,
+                    unmetered_fuel_spend_col=unmetered_fuel_spend_col,
+                    gas_tariff=gas_tariff,
+                    electricity_tariff=electricity_tariff,
+                    unit_converter=unit_converter,
+                    eligible=True,
+                )
+                for row in rows
+            ]
+
+            consumers = consumers + eligible_consumers
+
+        return cls(name=collection_name, consumers=consumers)
+
+    def copy(self, deep: bool = True):
+        """Return a copy of the ConsumerCollection."""
+        if deep:
+            return copy.deepcopy(self)
+        else:
+            return copy.copy(self)
+
+    def apply_support_to_eligible_consumers(
+        self,
+        adjustment_fuel: str,
+        adjustment_parameter: Union[float, Dict],
+        adjustment_mode: str,
+        inplace: bool = False,
+    ) -> Optional["ConsumerCollection"]:
+        """Applies social support adjustment to the fuel bills of eligible Consumers in ConsumerCollection. If inplace=False (default), returns a new instance of ConsumerCollection with applied support."""
+        consumers_with_support = []
+        for consumer in self.consumers:
+            if consumer.scheme_eligible == True:
+                consumers_with_support.append(
+                    consumer.apply_social_support_adjustment(
+                        adjustment_fuel=adjustment_fuel,
+                        adjustment_parameter=adjustment_parameter,
+                        adjustment_mode=adjustment_mode,
+                        inplace=False,
+                    )
+                )
+            else:
+                consumers_with_support.append(consumer)
+
+        if inplace:
+            self.consumers = consumers_with_support
+            return None
+        else:
+            return ConsumerCollection(
+                name=self.name + " with applied support",
+                consumers=consumers_with_support,
+                group_sizes=self.group_sizes,
+            )
+
+    def tidy_summary_consumers(self, scenario_name: Optional[str]) -> pd.DataFrame:
+        """Returns a Pandas DataFrame in tidy format listing all attributes of each Consumer object in ConsumerCollection.
+
+        Parameters
+        ----------
+        scenario_name : Optional[str]
+            Name of scenario run, if applicable, to be added as an additional column in the DataFrame.
+        """
+        tidy_summary = pd.concat(
+            [consumer.get_tidy_summary() for consumer in self.consumers]
+        )
+        if scenario_name:
+            tidy_summary["Scenario"] = scenario_name
+        return tidy_summary
+
+    def __str__(self):
+        """Print representation of ConsumerCollection instance."""
+        return f"'{self.name}' {self.__class__.__name__} containing {len(self.consumers)} Consumer objects ({[consumer.name for consumer in self.consumers]}), of sizes {self.group_sizes}."
+
+    def __repr__(self):
+        """Representation of ConsumerCollection instance."""
+        return f"{type(self).__name__}(name='{self.name}', consumers={self.consumers}, group_sizes={self.group_sizes})"
+
+    def __iter__(self):
+        yield from self.consumers
+
+    def iter_eligible(self):
+        yield from (consumer for consumer in self.consumers if consumer.scheme_eligible)
+
+    def iter_ineligible(self):
+        yield from (
+            consumer for consumer in self.consumers if not consumer.scheme_eligible
+        )
+
+    def __getitem__(self, key: tuple[str, bool]):
+        """Index ConsumerCollection based on Consumer name and eligibility."""
+        if not (isinstance(key[0], str) and isinstance(key[1], bool)):
+            raise TypeError(
+                "Key must be a list containing a string (name) and a boolean (eligibility)."
+            )
+
+        retrieved_consumer = [
+            consumer
+            for consumer in self.consumers
+            if consumer.name == key[0] and consumer.scheme_eligible == key[1]
+        ]
+
+        if not retrieved_consumer:
+            raise IndexError(
+                f"No Consumer object named '{key[0]}' with eligibilty: {key[1]}."
+            )
+
+        return retrieved_consumer
+
+    def __len__(self):
+        return len(self.consumers)
