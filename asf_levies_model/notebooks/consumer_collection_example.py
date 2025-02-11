@@ -1,21 +1,3 @@
-# -*- coding: utf-8 -*-
-# ---
-# jupyter:
-#   jupytext:
-#     cell_metadata_filter: -all
-#     comment_magics: true
-#     custom_cell_magics: kql
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.2
-#   kernelspec:
-#     display_name: asf_levies_model
-#     language: python
-#     name: python3
-# ---
-
 # %%
 import pandas as pd
 from datetime import datetime
@@ -48,8 +30,9 @@ from asf_levies_model.consumers import Consumer, ConsumerCollection
 
 from asf_levies_model.utils.utils import create_eligibility_group_sizes_dictionary
 
+
 # %% [markdown]
-# **Setting up Levy and Tariff objects**
+#  **Setting up Levy and Tariff objects**
 
 # %%
 # Denominator values from Desnz subnational consumption domestic data
@@ -75,6 +58,7 @@ total_supply_elec = (
 exempt_eii_supply = 9_417_916  # Oct-Dec2024 period, Annex 4, New FIT methodology tab
 fit_scaling_factor = supply_elec / (total_supply_elec - exempt_eii_supply)
 
+
 # %%
 # Initialise levies
 fileobject = download_annex_4(as_fileobject=True)
@@ -96,6 +80,7 @@ levies = [
 fileobject.close()
 pc = LevyCollection("Policy Costs", "pc", levies, denominator_values)
 
+
 # %%
 # Initialise tariffs (Other Payment method)
 fileobject = download_annex_9(as_fileobject=True)
@@ -105,10 +90,12 @@ gas_other_payment_nil = process_tariff_gas_other_payment_nil(fileobject)
 gas_other_payment_typical = process_tariff_gas_other_payment_typical(fileobject)
 fileobject.close()
 
+
 # %%
 print(f"From Ofgem: {pc.calculate_levies(2.7, 11.5, True, True)}")
 pc.rebalance_to_denominators(inplace=True)
 print(f"Rebalanced with our denominators: {pc.calculate_levies(2.7, 11.5, True, True)}")
+
 
 # %%
 # Gas tariff
@@ -121,17 +108,20 @@ electricity_tariff = ElectricityOtherPayment.from_dataframe(
     elec_other_payment_nil, elec_other_payment_typical
 )
 
+
 # %%
 # Update baseline bill policy costs to match denominator adjusted policy costs
 gas_tariff.update_policy_costs(pc, inplace=True)
 electricity_tariff.update_policy_costs(pc, inplace=True)
 
+
 # %% [markdown]
-# **Setting up ConsumerCollection**
+#  **Setting up ConsumerCollection**
 
 # %%
 # Load archetypes headline data
 ofgem_archetypes_df = ofgem_archetypes_data()
+
 
 # %%
 all_consumers = ConsumerCollection.from_dataframe(
@@ -152,30 +142,37 @@ all_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
+
+# %%
+all_consumers.consumers
+
 # %% [markdown]
-# Apply flat rebate of £150 to eligible consumers.
+#  Apply flat rebate of £150 to eligible consumers.
 
 # %%
 all_consumers_with_support = all_consumers.apply_support_to_eligible_consumers(
     "electricity", -150, "flat adjustment", inplace=False
 )
 
+
 # %%
-# Verify discount has been applied to A1 eligible
+# Verify discount has NOT been applied to A1 ineligible
 (
     all_consumers.consumers[0].combined_fuel_bill
     - all_consumers_with_support.consumers[0].combined_fuel_bill
 ), all_consumers.consumers[0].name, all_consumers.consumers[0].scheme_eligible,
 
+
 # %%
-# Verify discount has NOT been applied to A1 ineligible
+# Verify discount has been applied to A1 eligible
 (
     all_consumers.consumers[24].combined_fuel_bill
     - all_consumers_with_support.consumers[24].combined_fuel_bill
 ), all_consumers.consumers[24].name, all_consumers.consumers[24].scheme_eligible,
 
+
 # %% [markdown]
-# Get tidy summary tables
+#  Get tidy summary tables
 
 # %%
 baseline_df = all_consumers.tidy_summary_consumers(scenario_name="No support")
@@ -184,11 +181,12 @@ support_df = all_consumers_with_support.tidy_summary_consumers(
 )
 master_df = pd.concat([baseline_df, support_df]).reset_index(drop=True)
 
+
 # %%
 master_df
 
 # %% [markdown]
-# Add eligibility and ineligibility group sizes
+#  Add eligibility and ineligibility group sizes
 
 # %%
 # Load scheme eligibility size data
@@ -200,16 +198,22 @@ ofgem_archetypes_retired_pension_df = ofgem_archetypes_retired_pension()
 # Load benefit recipients size data
 ofgem_archetypes_benefit_recipients_df = ofgem_archetypes_benefit_recipients()
 
+
 # %% [markdown]
-# Let's assign the group sizes for Child Benefit recipients
+#  Let's assign the group sizes for Child Benefit recipients
 
 # %%
 # Check default group sizes
 all_consumers.group_sizes
 
+
 # %%
 # Create a copy of the generic ConsumerCollection
 consumers_with_child_benefit_eligibility = all_consumers.deepcopy()
+
+
+# %%
+
 
 # %%
 # Create group_sizes dictionary with ChildBenefitRecipient size for eligible and ineligible groups
@@ -220,15 +224,19 @@ cbr_sizes = create_eligibility_group_sizes_dictionary(
     eligible_size_col="ChildBenefitRecipientSize",
 )
 
+
 # %%
 print(cbr_sizes)
+
 
 # %%
 consumers_with_child_benefit_eligibility.group_sizes = cbr_sizes
 
+
 # %%
 # If we want the ineligible size for B4
 consumers_with_child_benefit_eligibility.group_sizes.get("B4").get(False)
+
 
 # %%
 ofgem_archetypes_benefit_recipients_df

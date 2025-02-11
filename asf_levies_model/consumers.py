@@ -467,7 +467,10 @@ class ConsumerCollection:
     """A container for Consumer objects."""
 
     def __init__(
-        self, name: str, consumers: list, group_sizes: Optional[Dict] = None
+        self,
+        name: str,
+        consumers: list[Consumer],
+        group_sizes: Optional[Dict[str, Dict[bool, int]]] = None,
     ) -> None:
         """Initializes a ConsumerCollection instance based on a list of provided Consumer objects.
 
@@ -493,7 +496,7 @@ class ConsumerCollection:
         cls,
         collection_name: str,
         df: pd.DataFrame,
-        rows: range,
+        rows: Union[list[int], range],
         name_col: str,
         archetype_col: str,
         net_annual_income_col: str,
@@ -515,7 +518,7 @@ class ConsumerCollection:
             Name of ConsumerCollection to be instantiated.
         df : pd.DataFrame
             Dataframe where each row corresponds to a consumer profile and columns describe (at least) name, net annual, income, main heating fuel, annual gas consumption, annual electricity consumption.
-        rows : range
+        rows : list or range
             Row indices in dataframe for consumer profile to instantiate.
         name_col : str
             Name of the dataframe column with unique consumer name (str).
@@ -548,27 +551,29 @@ class ConsumerCollection:
             ConsumerCollection instance.
         """
 
-        if model_eligibility_sets == False:
-            consumers = [
-                Consumer.consumer_from_dataframe(
-                    df=df,
-                    row=row,
-                    name_col=name_col,
-                    archetype_col=archetype_col,
-                    net_annual_income_col=net_annual_income_col,
-                    net_income_decile_col=net_income_decile_col,
-                    main_heating_fuel_col=main_heating_fuel_col,
-                    gas_consumption_col=gas_consumption_col,
-                    electricity_consumption_col=electricity_consumption_col,
-                    unmetered_fuel_spend_col=unmetered_fuel_spend_col,
-                    gas_tariff=gas_tariff,
-                    electricity_tariff=electricity_tariff,
-                    unit_converter=unit_converter,
-                    eligible=False,
-                )
-                for row in rows
-            ]
-        else:
+        # Always create ineligible consumers.
+        consumers = [
+            Consumer.consumer_from_dataframe(
+                df=df,
+                row=row,
+                name_col=name_col,
+                archetype_col=archetype_col,
+                net_annual_income_col=net_annual_income_col,
+                net_income_decile_col=net_income_decile_col,
+                main_heating_fuel_col=main_heating_fuel_col,
+                gas_consumption_col=gas_consumption_col,
+                electricity_consumption_col=electricity_consumption_col,
+                unmetered_fuel_spend_col=unmetered_fuel_spend_col,
+                gas_tariff=gas_tariff,
+                electricity_tariff=electricity_tariff,
+                unit_converter=unit_converter,
+                eligible=False,
+            )
+            for row in rows
+        ]
+
+        if model_eligibility_sets:
+            # create eligible consumers if you need them.
             eligible_consumers = [
                 Consumer.consumer_from_dataframe(
                     df=df,
@@ -588,32 +593,17 @@ class ConsumerCollection:
                 )
                 for row in rows
             ]
-            ineligible_consumers = [
-                Consumer.consumer_from_dataframe(
-                    df=df,
-                    row=row,
-                    name_col=name_col,
-                    archetype_col=archetype_col,
-                    net_annual_income_col=net_annual_income_col,
-                    net_income_decile_col=net_income_decile_col,
-                    main_heating_fuel_col=main_heating_fuel_col,
-                    gas_consumption_col=gas_consumption_col,
-                    electricity_consumption_col=electricity_consumption_col,
-                    unmetered_fuel_spend_col=unmetered_fuel_spend_col,
-                    gas_tariff=gas_tariff,
-                    electricity_tariff=electricity_tariff,
-                    unit_converter=unit_converter,
-                    eligible=False,
-                )
-                for row in rows
-            ]
-            consumers = eligible_consumers + ineligible_consumers
+
+            consumers = consumers + eligible_consumers
 
         return cls(name=collection_name, consumers=consumers)
 
-    def deepcopy(self) -> "ConsumerCollection":
-        """Returns deep copy of ConsumerCollection instance."""
-        return copy.deepcopy(self)
+    def copy(self, deep: bool = True):
+        """Return a copy of the ConsumerCollection."""
+        if deep:
+            return copy.deepcopy(self)
+        else:
+            return copy.copy(self)
 
     def apply_support_to_eligible_consumers(
         self,
@@ -644,6 +634,7 @@ class ConsumerCollection:
             return ConsumerCollection(
                 name=self.name + " with applied support",
                 consumers=consumers_with_support,
+                group_sizes=self.group_sizes,
             )
 
     def tidy_summary_consumers(self, scenario_name: Optional[str]) -> pd.DataFrame:
