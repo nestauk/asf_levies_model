@@ -1,3 +1,21 @@
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     comment_magics: true
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: asf_levies_model
+#     language: python
+#     name: python3
+# ---
+
 # %%
 import pandas as pd
 from datetime import datetime
@@ -144,7 +162,31 @@ all_consumers = ConsumerCollection.from_dataframe(
 
 
 # %%
-all_consumers.consumers
+# __repr__
+all_consumers
+
+# %%
+# __str__
+print(all_consumers)
+
+# %%
+# __iter__
+for consumer in all_consumers:
+    print(consumer)
+
+# %%
+# iter_eligible
+for eligible_consumer in all_consumers.iter_eligible():
+    print(eligible_consumer)
+
+# %%
+# iter_ineligible
+for ineligible_consumer in all_consumers.iter_ineligible():
+    print(ineligible_consumer)
+
+# %%
+# indexing Consumers with __getitem__
+all_consumers["A1", True]  # name, scheme_eligible
 
 # %% [markdown]
 #  Apply flat rebate of £150 to eligible consumers.
@@ -209,7 +251,7 @@ all_consumers.group_sizes
 
 # %%
 # Create a copy of the generic ConsumerCollection
-consumers_with_child_benefit_eligibility = all_consumers.deepcopy()
+consumers_with_child_benefit_eligibility = all_consumers.copy(deep=True)
 
 
 # %%

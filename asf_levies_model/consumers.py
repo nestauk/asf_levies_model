@@ -651,3 +651,45 @@ class ConsumerCollection:
         if scenario_name:
             tidy_summary["Scenario"] = scenario_name
         return tidy_summary
+
+    def __str__(self):
+        """Print representation of ConsumerCollection instance."""
+        return f"'{self.name}' {self.__class__.__name__} containing {len(self.consumers)} Consumer objects ({[consumer.name for consumer in self.consumers]}), of sizes {self.group_sizes}."
+
+    def __repr__(self):
+        """Representation of ConsumerCollection instance."""
+        return f"{type(self).__name__}(name='{self.name}', consumers={self.consumers}, group_sizes={self.group_sizes})"
+
+    def __iter__(self):
+        yield from self.consumers
+
+    def iter_eligible(self):
+        yield from (consumer for consumer in self.consumers if consumer.scheme_eligible)
+
+    def iter_ineligible(self):
+        yield from (
+            consumer for consumer in self.consumers if not consumer.scheme_eligible
+        )
+
+    def __getitem__(self, key: tuple[str, bool]):
+        """Index ConsumerCollection based on Consumer name and eligibility."""
+        if not (isinstance(key[0], str) and isinstance(key[1], bool)):
+            raise TypeError(
+                "Key must be a list containing a string (name) and a boolean (eligibility)."
+            )
+
+        retrieved_consumer = [
+            consumer
+            for consumer in self.consumers
+            if consumer.name == key[0] and consumer.scheme_eligible == key[1]
+        ]
+
+        if not retrieved_consumer:
+            raise IndexError(
+                f"No Consumer object named '{key[0]}' with eligibilty: {key[1]}."
+            )
+
+        return retrieved_consumer
+
+    def __len__(self):
+        return len(self.consumers)
