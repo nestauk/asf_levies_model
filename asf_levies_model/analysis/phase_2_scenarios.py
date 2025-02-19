@@ -167,10 +167,11 @@ rebalanced_consumers_flat_rebate = (
 Defining support parameters
 """
 flat_rebate = -450
-whd_core_target_spending = 452_546_789  # Annex 4
+whd_core_target_spending = pc["whd"].CoreSpending  # Annex 4
+whd_noncore_target_spending = pc["whd"].NoncoreSpending
 whd_core_target_recipients = whd_core_target_spending / 150
 
-whd_core_share = whd_core_target_spending / pc["whd"].revenue
+whd_core_factor = 3
 
 core_target_spending_electricity_weight = 0.5
 core_target_spending_gas_weight = 0.5
@@ -184,6 +185,7 @@ ofgem_archetypes_benefit_recipients_df = data.ofgem_archetypes_benefit_recipient
 
 total_whd_group = ofgem_archetypes_scheme_eligibility_df["WHDEligibleSize"].sum()
 total_wfp_group = ofgem_archetypes_scheme_eligibility_df["WFPEligibleSize"].sum()
+total_cwp_group = ofgem_archetypes_scheme_eligibility_df["CWPEligibleSize"].sum()
 total_uc_group = ofgem_archetypes_benefit_recipients_df[
     "UniversalCreditRecipientSize"
 ].sum()
@@ -195,12 +197,14 @@ total_wfp_cb_group = total_wfp_group + total_cb_group
 
 """
 0. Baseline Warm Homes Discount (WHD) eligibility
-Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue
+Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount core funding 3x revenue, non-core 1x.
 Targeted support: WHD eligible households
 """
 
 # Increase WHD revenue
-whd_pc = rebalanced_pc.update_revenues({"whd": pc["whd"].revenue * 3})
+whd_pc = rebalanced_pc.update_revenues(
+    {"whd": (whd_core_target_spending * whd_core_factor + whd_noncore_target_spending)}
+)
 
 # Update tariffs
 whd_gas_tariff = gas_tariff.update_policy_costs(whd_pc)
@@ -255,11 +259,11 @@ scaled_whd_sizes = {
 
 # Portion WHD core spend for discounting electricity consumption and for discounting gas consumption
 whd_core_target_spending_electricity = (
-    whd_pc["whd"].revenue * whd_core_share * core_target_spending_electricity_weight
-)
+    whd_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_electricity_weight
 whd_core_target_spending_gas = (
-    whd_pc["whd"].revenue * whd_core_share * core_target_spending_gas_weight
-)
+    whd_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_gas_weight
 
 # Estimate total electricity and gas consumption of all eligible households across archetypes
 whd_recipients_electricity_consumption = sum(
@@ -287,13 +291,19 @@ whd_consumers_unit_discount = whd_consumers.apply_support_to_eligible_consumers(
 
 """
 A. Winter Fuel Payment (WFP) eligibility
-Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue scaled to WFP eligibility size
+Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x core revenue scaled to WFP eligibility size
 Targeted support: WFP eligible households
 """
 
 # Increase WHD revenue
 wfp_pc = rebalanced_pc.update_revenues(
-    {"whd": (total_wfp_group / whd_core_target_recipients) * (pc["whd"].revenue * 3)}
+    {
+        "whd": (
+            (total_wfp_group / whd_core_target_recipients)
+            * (whd_core_target_spending * whd_core_factor)
+            + whd_noncore_target_spending
+        )
+    }
 )
 
 # Update tariffs
@@ -330,11 +340,11 @@ wfp_consumers_flat_rebate = wfp_consumers.apply_support_to_eligible_consumers(
 
 # Set new target core spend for WFP eligible households' electricity and gas consumption
 wfp_core_target_spending_electricity = (
-    wfp_pc["whd"].revenue * whd_core_share * core_target_spending_electricity_weight
-)
+    wfp_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_electricity_weight
 wfp_core_target_spending_gas = (
-    wfp_pc["whd"].revenue * whd_core_share * core_target_spending_gas_weight
-)
+    wfp_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_gas_weight
 
 # Get eligible group sizes for each archetype
 wfp_sizes = create_eligibility_group_sizes_dictionary(
@@ -376,7 +386,13 @@ Targeted support: UC recipient households
 
 # Increase WHD revenue
 uc_pc = rebalanced_pc.update_revenues(
-    {"whd": (total_uc_group / whd_core_target_recipients) * (pc["whd"].revenue * 3)}
+    {
+        "whd": (
+            (total_uc_group / whd_core_target_recipients)
+            * (whd_core_target_spending * whd_core_factor)
+            + whd_noncore_target_spending
+        )
+    }
 )
 
 # Update tariffs
@@ -413,11 +429,11 @@ uc_consumers_flat_rebate = uc_consumers.apply_support_to_eligible_consumers(
 
 # Set new target core spend for UC recipient households' electricity and gas consumption
 uc_core_target_spending_electricity = (
-    uc_pc["whd"].revenue * whd_core_share * core_target_spending_electricity_weight
-)
+    uc_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_electricity_weight
 uc_core_target_spending_gas = (
-    uc_pc["whd"].revenue * whd_core_share * core_target_spending_gas_weight
-)
+    uc_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_gas_weight
 
 # Get eligible group sizes for each archetype
 uc_sizes = create_eligibility_group_sizes_dictionary(
@@ -459,7 +475,13 @@ Targeted support: CB recipient eligible households
 
 # Increase WHD revenue
 cb_pc = rebalanced_pc.update_revenues(
-    {"whd": (total_cb_group / whd_core_target_recipients) * (pc["whd"].revenue * 3)}
+    {
+        "whd": (
+            (total_cb_group / whd_core_target_recipients)
+            * (whd_core_target_spending * whd_core_factor)
+            + whd_noncore_target_spending
+        )
+    }
 )
 
 # Update tariffs
@@ -496,11 +518,11 @@ cb_consumers_flat_rebate = cb_consumers.apply_support_to_eligible_consumers(
 
 # Set new target core spend for CB recipient households' electricity and gas consumption
 cb_core_target_spending_electricity = (
-    cb_pc["whd"].revenue * whd_core_share * core_target_spending_electricity_weight
-)
+    cb_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_electricity_weight
 cb_core_target_spending_gas = (
-    cb_pc["whd"].revenue * whd_core_share * core_target_spending_gas_weight
-)
+    cb_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_gas_weight
 
 # Get eligible group sizes for each archetype
 cb_sizes = create_eligibility_group_sizes_dictionary(
@@ -533,16 +555,109 @@ cb_consumers_unit_discount = cb_consumers.apply_support_to_eligible_consumers(
     "gas", unit_discount_cb_gas, "unit discount", inplace=False
 )
 
+"""
+D. Cold Weather Payment (CWP) recipient eligibility
+Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue scaled to CWP eligibility/recipient size
+Targeted support: CWP eligible/recipient households
+"""
+
+# Increase WHD revenue
+cwp_pc = rebalanced_pc.update_revenues(
+    {
+        "whd": (
+            (total_cwp_group / whd_core_target_recipients)
+            * (whd_core_target_spending * whd_core_factor)
+            + whd_noncore_target_spending
+        )
+    }
+)
+
+# Update tariffs
+cwp_gas_tariff = gas_tariff.update_policy_costs(cwp_pc)
+cwp_electricity_tariff = electricity_tariff.update_policy_costs(cwp_pc)
+
+# Create a CWP ConsumerCollection
+cwp_consumers = ConsumerCollection.from_dataframe(
+    collection_name="Cold Weather Payment scenario",
+    df=ofgem_archetypes_df,
+    rows=range(1, 25),
+    name_col="AnnualConsumptionProfile",
+    archetype_col="AnnualConsumptionProfile",
+    net_annual_income_col="NetAnnualHouseholdIncome",
+    net_income_decile_col="NetIncomeDecile",
+    main_heating_fuel_col="ArchetypeHeatingFuel",
+    gas_consumption_col="GaskWh",
+    electricity_consumption_col="ElectricitySingleRatekWh",
+    gas_tariff=cwp_gas_tariff,
+    electricity_tariff=cwp_electricity_tariff,
+    unmetered_fuel_spend_col="UnmeteredFuelSpend",
+    unit_converter=1_000,
+    model_eligibility_sets=True,
+)
+
+# Support method 1: Flat rebate discount
+
+# Apply support to eligible consumers
+cwp_consumers_flat_rebate = cwp_consumers.apply_support_to_eligible_consumers(
+    "electricity", flat_rebate, "flat adjustment", inplace=False
+)
+
+# Support method 2: Unit discount
+
+# Set new target core spend for CB recipient households' electricity and gas consumption
+cwp_core_target_spending_electricity = (
+    cwp_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_electricity_weight
+cwp_core_target_spending_gas = (
+    cwp_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_gas_weight
+
+# Get eligible group sizes for each archetype
+cwp_sizes = create_eligibility_group_sizes_dictionary(
+    df=ofgem_archetypes_scheme_eligibility_df,
+    group_name_col="AnnualConsumptionProfile",
+    total_size_col="ArchetypeSize",
+    eligible_size_col="CWPEligibleSize",
+)
+
+# Estimate total electricity and gas consumption of all eligible households across archetypes
+cwp_recipients_electricity_consumption = sum(
+    consumer.electricity_consumption * cwp_sizes[consumer.archetype][True]
+    for consumer in cwp_consumers.iter_eligible()
+)
+cwp_recipients_gas_consumption = sum(
+    consumer.gas_consumption * cwp_sizes[consumer.archetype][True]
+    for consumer in cwp_consumers.iter_eligible()
+)
+
+# Calculate unit discounts for electricity and gas
+unit_discount_cwp_electricity = (
+    cwp_core_target_spending_electricity / cwp_recipients_electricity_consumption
+)
+unit_discount_cwp_gas = cwp_core_target_spending_gas / cwp_recipients_gas_consumption
+
+# Apply support to eligible consumers
+cwp_consumers_unit_discount = cwp_consumers.apply_support_to_eligible_consumers(
+    "electricity", unit_discount_cwp_electricity, "unit discount", inplace=False
+).apply_support_to_eligible_consumers(
+    "gas", unit_discount_cwp_gas, "unit discount", inplace=False
+)
 
 """
-D. Winter Fuel Payment (WFP) & Child Benefit (CB) recipient eligibility
+E. Winter Fuel Payment (WFP) & Child Benefit (CB) recipient eligibility
 Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue scaled to WFP+CB eligibility/recipient size
 Targeted support: WFP+CB eligible/recipient households
 """
 
 # Increase WHD revenue
 wfp_cb_pc = rebalanced_pc.update_revenues(
-    {"whd": (total_wfp_cb_group / whd_core_target_recipients) * (pc["whd"].revenue * 3)}
+    {
+        "whd": (
+            (total_wfp_cb_group / whd_core_target_recipients)
+            * (whd_core_target_spending * whd_core_factor)
+            + whd_noncore_target_spending
+        )
+    }
 )
 
 # Update tariffs
@@ -551,7 +666,7 @@ wfp_cb_electricity_tariff = electricity_tariff.update_policy_costs(wfp_cb_pc)
 
 # Create a WFP+CB ConsumerCollection
 wfp_cb_consumers = ConsumerCollection.from_dataframe(
-    collection_name="All Universal Credit scenario",
+    collection_name="Winter Fuel Payment and Child Benefit scenario",
     df=ofgem_archetypes_df,
     rows=range(1, 25),
     name_col="AnnualConsumptionProfile",
@@ -579,11 +694,11 @@ wfp_cb_consumers_flat_rebate = wfp_cb_consumers.apply_support_to_eligible_consum
 
 # Set new target core spend for WFP+CB recipient households' electricity and gas consumption
 wfp_cb_core_target_spending_electricity = (
-    wfp_cb_pc["whd"].revenue * whd_core_share * core_target_spending_electricity_weight
-)
+    wfp_cb_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_electricity_weight
 wfp_cb_core_target_spending_gas = (
-    wfp_cb_pc["whd"].revenue * whd_core_share * core_target_spending_gas_weight
-)
+    wfp_cb_pc["whd"].revenue - whd_noncore_target_spending
+) * core_target_spending_gas_weight
 
 # Get eligible group sizes for each archetype
 wfp_cb_sizes = {
@@ -632,6 +747,7 @@ levy_collections = {
     wfp_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
     uc_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
     cb_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
+    cwp_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
     wfp_cb_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
 }
 
@@ -673,6 +789,8 @@ tariffs = {
     uc_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
     cb_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
     cb_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
+    cwp_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
+    cwp_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
     wfp_cb_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
     wfp_cb_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
 }
@@ -715,6 +833,10 @@ tariff_pairs = {
         cb_gas_tariff,
     ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
     (
+        cwp_electricity_tariff,
+        cwp_gas_tariff,
+    ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
+    (
         wfp_cb_electricity_tariff,
         wfp_cb_gas_tariff,
     ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
@@ -748,6 +870,8 @@ consumer_collections_levy_scenario = {
     uc_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
     cb_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
     cb_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
+    cwp_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
+    cwp_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
     wfp_cb_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
     wfp_cb_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
 }
@@ -763,6 +887,8 @@ consumer_collections_support_type = {
     uc_consumers_unit_discount: "Unit discount",
     cb_consumers_flat_rebate: "Flat rebate",
     cb_consumers_unit_discount: "Unit discount",
+    cwp_consumers_flat_rebate: "Flat rebate",
+    cwp_consumers_unit_discount: "Unit discount",
     wfp_cb_consumers_flat_rebate: "Flat rebate",
     wfp_cb_consumers_unit_discount: "Unit discount",
 }
@@ -778,6 +904,8 @@ consumer_collections_eligibility = {
     uc_consumers_unit_discount: "UC",
     cb_consumers_flat_rebate: "CB",
     cb_consumers_unit_discount: "CB",
+    cwp_consumers_flat_rebate: "CWP",
+    cwp_consumers_unit_discount: "CWP",
     wfp_cb_consumers_flat_rebate: "WFP+CB",
     wfp_cb_consumers_unit_discount: "WFP+CB",
 }
@@ -821,7 +949,7 @@ whd_row = pd.DataFrame(
             "Targeted group": "Support to WHD eligible",
             "WHD revenue (£ per year)": whd_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": whd_pc["whd"].revenue
-            * whd_core_share,
+            - whd_noncore_target_spending,
             "Number of target households": whd_core_target_recipients,
             "WHD target spend on electricity consumption of target households (£)": whd_core_target_spending_electricity,
             "WHD target spend on gas consumption of target households (£)": whd_core_target_spending_gas,
@@ -849,7 +977,7 @@ wfp_row = pd.DataFrame(
             "Targeted group": "Support to WFP eligible",
             "WHD revenue (£ per year)": wfp_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": wfp_pc["whd"].revenue
-            * whd_core_share,
+            - whd_noncore_target_spending,
             "Number of target households": total_wfp_group,
             "WHD target spend on electricity consumption of target households (£)": wfp_core_target_spending_electricity,
             "WHD target spend on gas consumption of target households (£)": wfp_core_target_spending_gas,
@@ -877,7 +1005,7 @@ uc_row = pd.DataFrame(
             "Targeted group": "Support to Universal Credit recipients",
             "WHD revenue (£ per year)": uc_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": uc_pc["whd"].revenue
-            * whd_core_share,
+            - whd_noncore_target_spending,
             "Number of target households": total_uc_group,
             "WHD target spend on electricity consumption of target households (£)": uc_core_target_spending_electricity,
             "WHD target spend on gas consumption of target households (£)": uc_core_target_spending_gas,
@@ -905,7 +1033,7 @@ cb_row = pd.DataFrame(
             "Targeted group": "Support to Child Benefit recipients",
             "WHD revenue (£ per year)": cb_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": cb_pc["whd"].revenue
-            * whd_core_share,
+            - whd_noncore_target_spending,
             "Number of target households": total_cb_group,
             "WHD target spend on electricity consumption of target households (£)": cb_core_target_spending_electricity,
             "WHD target spend on gas consumption of target households (£)": cb_core_target_spending_gas,
@@ -926,6 +1054,34 @@ cb_row = pd.DataFrame(
         }
     ]
 )
+cwp_row = pd.DataFrame(
+    [
+        {
+            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 3 x scaled to CWP eligibility size",
+            "Targeted group": "Support to Cold Weather Payment recipients",
+            "WHD revenue (£ per year)": cwp_pc["whd"].revenue,
+            "WHD target spend on core (£ per year)": cwp_pc["whd"].revenue
+            - whd_noncore_target_spending,
+            "Number of target households": total_cwp_group,
+            "WHD target spend on electricity consumption of target households (£)": cwp_core_target_spending_electricity,
+            "WHD target spend on gas consumption of target households (£)": cwp_core_target_spending_gas,
+            "Total electricity consumption of target households (MWh)": cwp_recipients_electricity_consumption,
+            "Total gas consumption of target households (MWh)": cwp_recipients_gas_consumption,
+            "Flat rebate (£)": 450,
+            "Unit discount electricity (£/MWh)": unit_discount_cwp_electricity,
+            "Unit discount gas (£/MWh)": unit_discount_cwp_gas,
+            "Percentage discount on unit of electricity (%)": (
+                unit_discount_cwp_electricity
+                / cwp_electricity_tariff.calculate_variable_consumption(1)
+            )
+            * 100,
+            "Percentage discount on unit of gas (%)": (
+                unit_discount_cwp_gas / cwp_gas_tariff.calculate_variable_consumption(1)
+            )
+            * 100,
+        }
+    ]
+)
 wfp_cb_row = pd.DataFrame(
     [
         {
@@ -933,7 +1089,7 @@ wfp_cb_row = pd.DataFrame(
             "Targeted group": "Support to Winter Fuel Payment and Child Benefit eligible/recipient households",
             "WHD revenue (£ per year)": wfp_cb_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": wfp_cb_pc["whd"].revenue
-            * whd_core_share,
+            - whd_noncore_target_spending,
             "Number of target households": total_wfp_cb_group,
             "WHD target spend on electricity consumption of target households (£)": wfp_cb_core_target_spending_electricity,
             "WHD target spend on gas consumption of target households (£)": wfp_cb_core_target_spending_gas,
@@ -957,7 +1113,16 @@ wfp_cb_row = pd.DataFrame(
 )
 
 support_info_df = pd.concat(
-    [support_info_df, rebalanced_row, whd_row, wfp_row, uc_row, cb_row, wfp_cb_row]
+    [
+        support_info_df,
+        rebalanced_row,
+        whd_row,
+        wfp_row,
+        uc_row,
+        cb_row,
+        cwp_row,
+        wfp_cb_row,
+    ]
 )
 
 
@@ -1045,6 +1210,7 @@ eligibility_size_lookup = {
     "WFP": wfp_sizes,
     "UC": uc_sizes,
     "CB": cb_sizes,
+    "CWP": cwp_sizes,
     "WFP+CB": wfp_cb_sizes,
 }
 group_sizes = []
@@ -1098,6 +1264,7 @@ scenario_order = [
     "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
     "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
     "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
+    "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
     "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
 ]
 master_summary_flourish = (
