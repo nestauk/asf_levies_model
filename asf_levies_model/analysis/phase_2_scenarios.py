@@ -83,7 +83,7 @@ electricity_tariff = electricity_tariff.update_policy_costs(pc)
 """
 Setting up status quo Consumers
 """
-# Create a rebalanced with status quo WHD rebate ConsumerCollection
+# Create a status quo WHD rebate ConsumerCollection
 ofgem_archetypes_df = data.ofgem_archetypes_data()
 status_quo_consumers = ConsumerCollection.from_dataframe(
     collection_name="Baseline RO FiT on gas WHDx1",
@@ -380,7 +380,7 @@ wfp_consumers_unit_discount = wfp_consumers.apply_support_to_eligible_consumers(
 
 """
 B. Universal Credit (UC) recipient eligibility
-Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue scaled to UC recipient size
+Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x core revenue scaled to UC recipient size
 Targeted support: UC recipient households
 """
 
@@ -469,7 +469,7 @@ uc_consumers_unit_discount = uc_consumers.apply_support_to_eligible_consumers(
 
 """
 C. Child Benefit (CB) recipient eligibility
-Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue scaled to CB recipient size
+Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x core revenue scaled to CB recipient size
 Targeted support: CB recipient eligible households
 """
 
@@ -557,7 +557,7 @@ cb_consumers_unit_discount = cb_consumers.apply_support_to_eligible_consumers(
 
 """
 D. Cold Weather Payment (CWP) recipient eligibility
-Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue scaled to CWP eligibility/recipient size
+Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x core revenue scaled to CWP eligibility/recipient size
 Targeted support: CWP eligible/recipient households
 """
 
@@ -645,7 +645,7 @@ cwp_consumers_unit_discount = cwp_consumers.apply_support_to_eligible_consumers(
 
 """
 E. Winter Fuel Payment (WFP) & Child Benefit (CB) recipient eligibility
-Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x revenue scaled to WFP+CB eligibility/recipient size
+Levy reform: Rebalance RO and FiT to gas, Warm Homes Discount 3x core revenue scaled to WFP+CB eligibility/recipient size
 Targeted support: WFP+CB eligible/recipient households
 """
 
@@ -742,13 +742,13 @@ Printing outputs
 # Information about levies
 levy_collections = {
     pc: "Status quo",
-    rebalanced_pc: "Rebalance RO+FiT to gas",
-    whd_pc: "Rebalance RO+FiT to gas; WHD revenue x 3",
-    wfp_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
-    uc_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
-    cb_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
-    cwp_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
-    wfp_cb_pc: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
+    rebalanced_pc: "Rebalance RO+FiT to gas, WHD revenue x 1",
+    whd_pc: "Rebalance RO+FiT to gas, WHD core revenue x 3",
+    wfp_pc: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
+    uc_pc: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
+    cb_pc: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
+    cwp_pc: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
+    wfp_cb_pc: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
 }
 
 levies_info_df = pd.DataFrame()
@@ -779,20 +779,19 @@ tidy_levies_info = pd.melt(levies_info_df, id_vars=["Scenario", "Levy"])
 tariffs = {
     gas_tariff: "Status quo",
     electricity_tariff: "Status quo",
-    rebalanced_gas_tariff: "Rebalance RO+FiT to gas",
-    rebalanced_electricity_tariff: "Rebalance RO+FiT to gas",
-    whd_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3",
-    whd_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3",
-    wfp_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
-    wfp_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
-    uc_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
-    uc_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
-    cb_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
-    cb_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
-    cwp_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
-    cwp_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
-    wfp_cb_gas_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
-    wfp_cb_electricity_tariff: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
+    rebalanced_gas_tariff: "Rebalance RO+FiT to gas, WHD revenue x 1",
+    rebalanced_electricity_tariff: "Rebalance RO+FiT to gas, WHD revenue x 1",
+    whd_gas_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3",
+    wfp_gas_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
+    wfp_electricity_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
+    uc_gas_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
+    uc_electricity_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
+    cb_gas_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
+    cb_electricity_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
+    cwp_gas_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
+    cwp_electricity_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
+    wfp_cb_gas_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
+    wfp_cb_electricity_tariff: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
 }
 tariffs_info_df = pd.DataFrame()
 for tariff in tariffs.keys():
@@ -815,31 +814,34 @@ tidy_tariffs_info = pd.melt(tariffs_info_df, id_vars=["Scenario", "Tariff"])
 # Information about electricity to gas unit price ratio
 tariff_pairs = {
     (electricity_tariff, gas_tariff): "Status quo",
-    (rebalanced_electricity_tariff, rebalanced_gas_tariff): "Rebalance RO+FiT to gas",
+    (
+        rebalanced_electricity_tariff,
+        rebalanced_gas_tariff,
+    ): "Rebalance RO+FiT to gas, WHD revenue x 1",
     (
         whd_electricity_tariff,
         whd_gas_tariff,
-    ): "Rebalance RO+FiT to gas; WHD revenue x 3",
+    ): "Rebalance RO+FiT to gas, WHD core revenue x 3",
     (
         wfp_electricity_tariff,
         wfp_gas_tariff,
-    ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
+    ): "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
     (
         uc_electricity_tariff,
         uc_gas_tariff,
-    ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
+    ): "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
     (
         cb_electricity_tariff,
         cb_gas_tariff,
-    ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
+    ): "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
     (
         cwp_electricity_tariff,
         cwp_gas_tariff,
-    ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
+    ): "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
     (
         wfp_cb_electricity_tariff,
         wfp_cb_gas_tariff,
-    ): "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
+    ): "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
 }
 
 cost_ratio_df = pd.DataFrame()
@@ -862,18 +864,18 @@ for (tariff_electricity, tariff_gas), scenario in tariff_pairs.items():
 consumer_collections_levy_scenario = {
     status_quo_consumers_flat_rebate: "Status quo, WHD revenue x 1",
     rebalanced_consumers_flat_rebate: "Rebalance RO+FiT to gas, WHD revenue x 1",
-    whd_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3",
-    whd_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3",
-    wfp_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
-    wfp_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
-    uc_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
-    uc_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
-    cb_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
-    cb_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
-    cwp_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
-    cwp_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
-    wfp_cb_consumers_flat_rebate: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
-    wfp_cb_consumers_unit_discount: "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
+    whd_consumers_flat_rebate: "Rebalance RO+FiT to gas, WHD core revenue x 3",
+    whd_consumers_unit_discount: "Rebalance RO+FiT to gas, WHD core revenue x 3",
+    wfp_consumers_flat_rebate: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
+    wfp_consumers_unit_discount: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
+    uc_consumers_flat_rebate: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
+    uc_consumers_unit_discount: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
+    cb_consumers_flat_rebate: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
+    cb_consumers_unit_discount: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
+    cwp_consumers_flat_rebate: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
+    cwp_consumers_unit_discount: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
+    wfp_cb_consumers_flat_rebate: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
+    wfp_cb_consumers_unit_discount: "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
 }
 
 consumer_collections_support_type = {
@@ -929,7 +931,7 @@ support_info_df = pd.DataFrame()
 rebalanced_row = pd.DataFrame(
     [
         {
-            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 1",
+            "Levy reform": "Rebalance RO+FiT to gas, WHD revenue x 1",
             "Targeted group": "Support to WHD eligible",
             "WHD revenue (£ per year)": rebalanced_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": whd_core_target_spending,
@@ -945,7 +947,7 @@ rebalanced_row = pd.DataFrame(
 whd_row = pd.DataFrame(
     [
         {
-            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 3",
+            "Levy reform": "Rebalance RO+FiT to gas, WHD core revenue x 3",
             "Targeted group": "Support to WHD eligible",
             "WHD revenue (£ per year)": whd_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": whd_pc["whd"].revenue
@@ -973,7 +975,7 @@ whd_row = pd.DataFrame(
 wfp_row = pd.DataFrame(
     [
         {
-            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 3 x scaled to WFP eligibility size",
+            "Levy reform": "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
             "Targeted group": "Support to WFP eligible",
             "WHD revenue (£ per year)": wfp_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": wfp_pc["whd"].revenue
@@ -1001,7 +1003,7 @@ wfp_row = pd.DataFrame(
 uc_row = pd.DataFrame(
     [
         {
-            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 3 x scaled to UC eligibility size",
+            "Levy reform": "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
             "Targeted group": "Support to Universal Credit recipients",
             "WHD revenue (£ per year)": uc_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": uc_pc["whd"].revenue
@@ -1029,7 +1031,7 @@ uc_row = pd.DataFrame(
 cb_row = pd.DataFrame(
     [
         {
-            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 3 x scaled to CB eligibility size",
+            "Levy reform": "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
             "Targeted group": "Support to Child Benefit recipients",
             "WHD revenue (£ per year)": cb_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": cb_pc["whd"].revenue
@@ -1057,7 +1059,7 @@ cb_row = pd.DataFrame(
 cwp_row = pd.DataFrame(
     [
         {
-            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 3 x scaled to CWP eligibility size",
+            "Levy reform": "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
             "Targeted group": "Support to Cold Weather Payment recipients",
             "WHD revenue (£ per year)": cwp_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": cwp_pc["whd"].revenue
@@ -1085,7 +1087,7 @@ cwp_row = pd.DataFrame(
 wfp_cb_row = pd.DataFrame(
     [
         {
-            "Levy reform": "Rebalance RO+FIT to gas, WHD revenue x 3 x scaled to WFP+CB eligibility size",
+            "Levy reform": "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
             "Targeted group": "Support to Winter Fuel Payment and Child Benefit eligible/recipient households",
             "WHD revenue (£ per year)": wfp_cb_pc["whd"].revenue,
             "WHD target spend on core (£ per year)": wfp_cb_pc["whd"].revenue
@@ -1204,6 +1206,41 @@ master_summary_flourish["ScenarioSupportEligibility"] = (
     + master_summary_flourish["EligibleForSupport"].astype(str)
 )
 
+# Add reader-friendly scenario description
+scenario_description = {
+    "Status quo, WHD revenue x 1 + Flat rebate + False": "Status quo - WHD - Flat rebate - Ineligible",
+    "Status quo, WHD revenue x 1 + Flat rebate + True": "Status quo - WHD - Flat rebate - Eligible",
+    "Rebalance RO+FiT to gas, WHD revenue x 1 + Flat rebate + False": "Rebalancing - WHD - Flat rebate - Ineligible",
+    "Rebalance RO+FiT to gas, WHD revenue x 1 + Flat rebate + True": "Rebalancing - WHD - Flat rebate - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 + Unit discount + False": "Rebalancing - WHDx3 - Unit discount - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 + Flat rebate + False": "Rebalancing - WHDx3 - Flat rebate - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 + Unit discount + True": "Rebalancing - WHDx3 - Unit discount - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 + Flat rebate + True": "Rebalancing - WHDx3 - Flat rebate - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size + Unit discount + False": "Rebalancing - WFP - Unit discount - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size + Flat rebate + False": "Rebalancing - WFP - Flat rebate - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size + Flat rebate + True": "Rebalancing - WFP - Flat rebate - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size + Unit discount + True": "Rebalancing - WFP - Unit discount - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size + Unit discount + False": "Rebalancing - UC - Unit discount - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size + Flat rebate + False": "Rebalancing - UC - Flat rebate - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size + Unit discount + True": "Rebalancing - UC - Unit discount - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size + Flat rebate + True": "Rebalancing - UC - Flat rebate - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size + Unit discount + False": "Rebalancing - CB - Unit discount - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size + Flat rebate + False": "Rebalancing - CB - Flat rebate - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size + Unit discount + True": "Rebalancing - CB - Unit discount - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size + Flat rebate + True": "Rebalancing - CB - Flat rebate - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size + Unit discount + False": "Rebalancing - CWP - Unit discount - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size + Flat rebate + False": "Rebalancing - CWP - Flat rebate - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size + Unit discount + True": "Rebalancing - CWP - Unit discount - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size + Flat rebate + True": "Rebalancing - CWP - Flat rebate - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size + Unit discount + False": "Rebalancing - WFP+CB - Unit discount - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size + Flat rebate + False": "Rebalancing - WFP+CB - Flat rebate - Ineligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size + Unit discount + True": "Rebalancing - WFP+CB - Unit discount - Eligible",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size + Flat rebate + True": "Rebalancing - WFP+CB - Flat rebate - Eligible",
+}
+master_summary_flourish["ScenarioLabel"] = master_summary_flourish[
+    "ScenarioSupportEligibility"
+].map(scenario_description)
+
 # Add group sizes
 eligibility_size_lookup = {
     "WHD": scaled_whd_sizes,
@@ -1260,12 +1297,12 @@ master_summary_flourish.loc[:, "Net change in annual energy bill"] = bill_change
 scenario_order = [
     "Status quo, WHD revenue x 1",
     "Rebalance RO+FiT to gas, WHD revenue x 1",
-    "Rebalance RO+FiT to gas; WHD revenue x 3",
-    "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP eligibility size",
-    "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to UC eligibility size",
-    "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CB eligibility size",
-    "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to CWP eligibility size",
-    "Rebalance RO+FiT to gas; WHD revenue x 3 x scaled to WFP+CB eligibility size",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP eligibility size",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to UC eligibility size",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CB eligibility size",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to CWP eligibility size",
+    "Rebalance RO+FiT to gas, WHD core revenue x 3 x scaled to WFP+CB eligibility size",
 ]
 master_summary_flourish = (
     master_summary_flourish.assign(
@@ -1273,8 +1310,8 @@ master_summary_flourish = (
             {s: i for i, s in enumerate(scenario_order)}
         )
     )
-    .sort_values(["ScenarioRank", "Name", "EligibleForSupport"])
-    .drop(columns=["ScenarioRank"])  # Drop the temporary ranking column
+    .sort_values(["ScenarioRank", "Name", "SupportType", "EligibleForSupport"])
+    .drop(columns=["ScenarioRank"])
     .reset_index(drop=True)
 )
 
@@ -1407,3 +1444,22 @@ try:
     print("Tables for Flourish successfully written to Excel file.")
 except Exception as e:
     print(f"Failed to write Excel file: {e}")
+
+
+"""
+Pickling select dataframes for further processing
+"""
+
+pickle_path_summary = (
+    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_summary_table.pkl"
+)
+pickle_path_support_info = (
+    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_support_information.pkl"
+)
+
+try:
+    master_summary_flourish.to_pickle(pickle_path_summary)
+    support_info_df.to_pickle(pickle_path_support_info)
+    print("Summary dataframes successfully pickled for further processing.")
+except Exception as e:
+    print(f"Failed to pickle dataframes: {e}")
