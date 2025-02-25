@@ -304,6 +304,7 @@ def _get_charging_years(policy_df: pd.DataFrame, policy_acronym: str) -> list:
         "eco": "ECO scheme year:",
         "aahedc": "AAHEDC charging year:",
         "ggl": "GGL scheme year:",
+        "ncc": "NCC scheme year:",
     }.get(policy_acronym.lower())
     if not policy_string:
         raise ValueError("Acronym given does not match a valid policy.")
@@ -434,6 +435,18 @@ def process_data_GGL(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     parameters = ["Levy rate", "Backdated levy rate for first scheme year"]
     names = ["LevyRate", "BackdatedLevyRate"]
     return _process_data("GGL", parameters, names, fileobject)
+
+
+def process_data_NCC(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
+    """Extracts and transforms data from corresponding NCC tab in annex 4 into tidy format."""
+    parameters = [
+        "Estimated Levy Fund",
+        "Administrative costs",
+        "Reserve Fund",
+        "Elligible Demand (Domestic and Non-Domestic)",
+    ]
+    names = ["EstimatedLevyFund", "AdminCosts", "ReserveFund", "ElligibleDemand"]
+    return _process_data("NCC", parameters, names, fileobject)
 
 
 def process_data_ECO(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
