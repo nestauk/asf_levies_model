@@ -31,8 +31,8 @@ def create_weighted_histogram(
     df: pd.DataFrame,
     scenario_support_name: str,
     eligible_only: bool = True,
-    x_limits=(-500, 200),
-    num_bins=14,
+    x_limits=(-750, 250),
+    num_bins=20,
     y_limits=(0, 20_000_000),
 ):
     if eligible_only:
@@ -81,8 +81,8 @@ def create_weighted_histogram_dataframe(
     scenario_support_name: str,
     eligible_only: bool = True,
 ):
-    # Define custom bins from -500 to 200 with intervals of 50
-    bins = np.arange(-700, 251, 50)
+    # Define custom bins from -750 to 250 with intervals of 50
+    bins = np.arange(-750, 251, 50)
     bin_labels = pd.IntervalIndex.from_breaks(bins, closed="left")
 
     if eligible_only:
