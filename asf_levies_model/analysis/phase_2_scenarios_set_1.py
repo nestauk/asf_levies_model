@@ -1133,7 +1133,7 @@ Saving raw results data to Excel
 """
 today = datetime.now()
 date_str = today.strftime("%Y%m%d")
-filename = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios.xlsx"
+filename = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_1.xlsx"
 
 try:
     with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
@@ -1426,7 +1426,7 @@ for scenario in unique_scenarios:
 Saving Flourish data tables to Excel
 """
 flourish_filename = (
-    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_flourish.xlsx"
+    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_1_flourish.xlsx"
 )
 try:
     with pd.ExcelWriter(flourish_filename, engine="xlsxwriter") as writer:
@@ -1451,11 +1451,9 @@ Pickling select dataframes for further processing
 """
 
 pickle_path_summary = (
-    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_summary_table.pkl"
+    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_1_summary_table.pkl"
 )
-pickle_path_support_info = (
-    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_support_information.pkl"
-)
+pickle_path_support_info = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_1_support_information.pkl"
 
 try:
     master_summary_flourish.to_pickle(pickle_path_summary)
