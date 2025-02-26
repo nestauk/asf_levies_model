@@ -1078,7 +1078,10 @@ price cap period of interest.
         )
 
         if not revenue:
-            revenue = df.EstimatedLevyFund * scaling_factor
+            revenue = (
+                sum([df.EstimatedLevyFund, df.AdminCosts, df.ReserveFund])
+                * scaling_factor
+            )
         else:
             revenue *= scaling_factor
 
