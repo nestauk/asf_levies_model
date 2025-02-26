@@ -29,8 +29,12 @@ denominator_values = {
 total_supply_elec = (
     249_044_438  # DESNZ GB total electricity consumption - all meters (2023)
 )
-exempt_eii_supply = 9_417_916  # Oct-Dec2024 period, Annex 4, New FIT methodology tab
+exempt_eii_supply = 10_529_633  # Apr-Jun2025 period, Annex 4, New FIT methodology tab
 fit_scaling_factor = supply_elec / (total_supply_elec - exempt_eii_supply)
+
+# Scaling factor for estimating domestic share of NCC revenue
+ncc_eligible_supply = 119_380_310.7  # Mar-Jun2025 period, Annex 4, NCC methodology tab
+ncc_scaling_factor = supply_elec / ncc_eligible_supply
 
 # Instantiate LevyCollection
 fileobject = data.download_annex_4(as_fileobject=True)
@@ -51,6 +55,9 @@ list_levies = [
     levies.FIT.from_dataframe(
         data.process_data_FIT(fileobject),
         scaling_factor=fit_scaling_factor,
+    ),
+    levies.NCC.from_dataframe(
+        data.process_data_NCC(fileobject), scaling_factor=ncc_scaling_factor
     ),
 ]
 fileobject.close()
