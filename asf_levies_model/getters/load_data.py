@@ -445,7 +445,7 @@ def process_data_NCC(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         "Reserve Fund",
         "Elligible Demand (Domestic and Non-Domestic)",
     ]
-    names = ["EstimatedLevyFund", "AdminCosts", "ReserveFund", "ElligibleDemand"]
+    names = ["EstimatedLevyFund", "AdminCosts", "ReserveFund", "EligibleDemand"]
     return _process_data("NCC", parameters, names, fileobject)
 
 

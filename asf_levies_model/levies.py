@@ -942,6 +942,182 @@ price cap period of interest.
         )
 
 
+class NCC(Levy):
+    """Network Charging Compensation Scheme.\n"""
+
+    __doc__ += (
+        Levy.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+    UpdateDate: datetime, month and year ofgem data was updated.
+        SchemeYear: str, year of interest.
+        EstimatedLevyFund: float, total estimated levyfund amount.
+        AdminCosts: float, establishing and operating process costs.
+        ReserveFund: float, reserve allowance.
+        EligibleDemand: float, supply volume domestic and non-domestic, non-EII (MWh).
+"""
+    )
+
+    @_generate_docstring(
+        Levy.__init__.__doc__,
+        [
+            "    UpdateDate: month and year of ofgem update.",
+            "            SchemeYear: year of interest",
+            "            EstimatedLevyFund: total estimated levyfund amount",
+            "            AdminCosts: establishing and operating process costs",
+            "            ReserveFund: reserve allowance",
+            "            EligibleDemand: supply volume domestic and non-domestic, non-EII (MWh)",
+        ],
+    )
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        electricity_weight: float,
+        gas_weight: float,
+        tax_weight: float,
+        electricity_variable_weight: float,
+        electricity_fixed_weight: float,
+        gas_variable_weight: float,
+        gas_fixed_weight: float,
+        electricity_variable_rate: float,
+        electricity_fixed_rate: float,
+        gas_variable_rate: float,
+        gas_fixed_rate: float,
+        general_taxation: float,
+        revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
+        UpdateDate: datetime,
+        SchemeYear: str,
+        EstimatedLevyFund: float,
+        AdminCosts: float,
+        ReserveFund: float,
+        EligibleDemand: float,
+    ) -> None:
+        super(NCC, self).__init__(
+            name,
+            short_name,
+            electricity_weight,
+            gas_weight,
+            tax_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
+            electricity_variable_rate,
+            electricity_fixed_rate,
+            gas_variable_rate,
+            gas_fixed_rate,
+            general_taxation,
+            revenue,
+            price_cap_period,
+        )
+        self.UpdateDate = UpdateDate
+        self.SchemeYear = SchemeYear
+        self.EstimatedLevyFund = EstimatedLevyFund
+        self.AdminCosts = AdminCosts
+        self.ReserveFund = ReserveFund
+        self.EligibleDemand = EligibleDemand
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        df: pd.DataFrame,
+        revenue: float = None,
+        scaling_factor: float = 1.0,
+        price_cap: str = "LATEST",
+    ) -> "NCC":
+        """Create NCC levy instance from dataframe input.
+
+        Uses the `process_data_NCC()` output from `asf_levies_model.getters.load_data` to \
+initialise an NCC levy object at present values.
+
+        As NCC has a stated levy fund amount, this is used by default as the revenue, however a revenue \
+value can also be provided if a different value is required.
+
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
+        Args:
+            df: a dataframe with UpdateDate, SchemeYear, LevyRate, BackdatedLevyRate fields.
+            revenue: float, a total revenue amount (£) for the levy.
+            scaling_factor: float, factor to scale total revenue amount (£) to reflect e.g. only domestic share.
+            price_cap: str, price cap period to use; default: LATEST.
+
+        Raises:
+            ValueError: revenue or denominator must be provided.
+        """
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = df["EstimatedLevyFund"].notna().to_numpy().nonzero()[0].max()
+
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
+
+        ncc_levy = cls.calculate_ncc_rate(
+            df.EstimatedLevyFund, df.AdminCosts, df.ReserveFund, df.EligibleDemand
+        )
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
+        if not revenue:
+            revenue = df.EstimatedLevyFund * scaling_factor
+        else:
+            revenue *= scaling_factor
+
+        return cls(
+            name="Network Charging Compensation Scheme",
+            short_name="ncc",
+            electricity_weight=1,
+            gas_weight=0,
+            tax_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=0,
+            gas_fixed_weight=0,
+            electricity_variable_rate=ncc_levy,
+            electricity_fixed_rate=0,
+            gas_variable_rate=0,
+            gas_fixed_rate=0,
+            general_taxation=0,
+            revenue=revenue,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            EstimatedLevyFund=df.EstimatedLevyFund,
+            AdminCosts=df.AdminCosts,
+            ReserveFund=df.ReserveFund,
+            EligibleDemand=df.EligibleDemand,
+        )
+
+    @staticmethod
+    def calculate_ncc_rate(
+        EstimatedLevyFund: float,
+        AdminCosts: float,
+        ReserveFund: float,
+        EligibleDemand: float,
+    ) -> float:
+        """Calculate Network Charging Compensation Scheme rate from given values."""
+        return sum([EstimatedLevyFund, AdminCosts, ReserveFund]) / EligibleDemand
+
+
 class WHD(Levy):
     """Warm Homes Discount Levy.\n"""
 
@@ -2058,7 +2234,7 @@ class LevyCollection:
             levy.price_cap_period == levies[0].price_cap_period for levy in levies
         ):
             raise ValueError("All levies must have the same price_cap_period")
-            
+
         self.name = name
         self.short_name = short_name
         self.levies = levies
