@@ -12,14 +12,14 @@ Load summary table
 today = datetime.now()
 date_str = today.strftime("%Y%m%d")
 pickle_path_summary = (
-    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_2_summary_table.pkl"
+    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_3_summary_table.pkl"
 )
 master_summary = pd.read_pickle(pickle_path_summary)
 
 # Results with 95th percentile consumption
 today = datetime.now()
 date_str = today.strftime("%Y%m%d")
-pickle_path_summary = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_2_95pct_summary_table.pkl"
+pickle_path_summary = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_3_95pct_summary_table.pkl"
 master_summary_95pct = pd.read_pickle(pickle_path_summary)
 
 """
@@ -31,8 +31,8 @@ def create_weighted_histogram(
     df: pd.DataFrame,
     scenario_support_name: str,
     eligible_only: bool = True,
-    x_limits=(-750, 250),
-    num_bins=20,
+    x_limits=(-850, 450),
+    num_bins=26,
     y_limits=(0, 20_000_000),
 ):
     if eligible_only:
@@ -82,7 +82,7 @@ def create_weighted_histogram_dataframe(
     eligible_only: bool = True,
 ):
     # Define custom bins from -750 to 250 with intervals of 50
-    bins = np.arange(-750, 251, 50)
+    bins = np.arange(-850, 451, 50)
     bin_labels = pd.IntervalIndex.from_breaks(bins, closed="left")
 
     if eligible_only:
@@ -143,7 +143,7 @@ for scenario in scenario_names:
 Saving Flourish data tables to Excel
 """
 
-histograms_filename = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_2_histogram_tables.xlsx"
+histograms_filename = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_3_histogram_tables.xlsx"
 try:
     with pd.ExcelWriter(histograms_filename, engine="xlsxwriter") as writer:
         # Individual scenario tables
@@ -157,7 +157,7 @@ try:
 except Exception as e:
     print(f"Failed to write Excel file: {e}")
 
-histograms_filename_95pct = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_2_95pct_histogram_tables.xlsx"
+histograms_filename_95pct = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_3_95pct_histogram_tables.xlsx"
 try:
     with pd.ExcelWriter(histograms_filename_95pct, engine="xlsxwriter") as writer:
         # Individual scenario tables
