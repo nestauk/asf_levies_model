@@ -1306,19 +1306,32 @@ def create_table_for_flourish(
     ]
 
     # Add rows for plotting helper arrows
-    arrow_rows = table.tail(24).copy()
+    arrow_rows = table.tail(24).copy()  # copies eligible values
     arrow_rows["Main Fuel"] = "Helper arrow"
 
-    # Tailor the direction of arrow based on ineligible > eligible change
+    # Tailor the direction of arrow
     def adjust_energy_bill(row):
-        matching_row = table[table["Group"] == row["Group"]]
+
+        matching_row = table[table["Archetype"] == row["Archetype"]]
         reference_value = matching_row["Net change in annual energy bill"].values[
             0
-        ]  # Ineligible value
-        if row["Net change in annual energy bill"] >= reference_value:
-            return row["Net change in annual energy bill"] + 20
+        ]  # ineligible value
+        if reference_value > row["Net change in annual energy bill"]:
+            if reference_value > 0:
+                difference = abs(reference_value) + abs(
+                    row["Net change in annual energy bill"]
+                )
+                return row["Net change in annual energy bill"] + (difference * 0.1)
+            else:
+                difference = abs(row["Net change in annual energy bill"]) - abs(
+                    reference_value
+                )
+                return row["Net change in annual energy bill"] + (difference * 0.3)
         else:
-            return reference_value - 20
+            difference = abs(reference_value) - abs(
+                row["Net change in annual energy bill"]
+            )
+            return row["Net change in annual energy bill"] - (difference * 0.5)
 
     arrow_rows["Net change in annual energy bill"] = arrow_rows.apply(
         adjust_energy_bill, axis=1
