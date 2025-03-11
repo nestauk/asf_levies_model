@@ -275,8 +275,8 @@ core_target_spending_gas = new_whd_core * cwp_core_target_spending_gas_weight
 # Calculate unit discounts for electricity and gas
 unit_discount_electricity = (
     core_target_spending_electricity / cwp_recipients_electricity_consumption
-)
-unit_discount_gas = core_target_spending_gas / cwp_recipients_gas_consumption
+) * 1.05
+unit_discount_gas = core_target_spending_gas / cwp_recipients_gas_consumption * 1.05
 
 
 """
