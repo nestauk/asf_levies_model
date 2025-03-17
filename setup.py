@@ -27,11 +27,7 @@ setup(
     package_data={
         "": [
             "base.yaml",
-            "archetypes_equiv_income_deciles.pkl",
-            "archetypes_headline_data.pkl",
-            "archetypes_net_income_deciles.pkl",
-            "archetypes_retired_pension.pkl",
-            "archetypes_scheme_eligibility.pkl",
+            "master_archetypes_data.pkl",
         ]
     },
     include_package_data=True,
