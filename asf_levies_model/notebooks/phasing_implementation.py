@@ -1,3 +1,21 @@
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     comment_magics: true
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: asf_levies_model
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # ### Implementing rebalancing through phasing
 
@@ -73,7 +91,7 @@ target_whd_core_spend = 1_600_000_000
 whd_industry_initiatives = 50_000_000
 
 # Pinning target recipients to value at time 0
-whd_core_target_recipients = (545_000_000 - whd_industry_initiatives) / 150
+# whd_core_target_recipients = (545_000_000 - whd_industry_initiatives) / 150
 
 # %% [markdown]
 # **Scheme Eligibility Sizes**
@@ -92,24 +110,24 @@ cwp_sizes = create_eligibility_group_sizes_dictionary(
 
 # WHD eligibility sizes
 # For scenario description purposes only
-total_whd_group = ofgem_archetypes_scheme_eligibility_df["WHDEligibleSize"].sum()
-whd_sizes = create_eligibility_group_sizes_dictionary(
-    df=ofgem_archetypes_scheme_eligibility_df,
-    group_name_col="AnnualConsumptionProfile",
-    total_size_col="ArchetypeSize",
-    eligible_size_col="WHDEligibleSize",
-)
+# total_whd_group = ofgem_archetypes_scheme_eligibility_df["WHDEligibleSize"].sum()
+# whd_sizes = create_eligibility_group_sizes_dictionary(
+#     df=ofgem_archetypes_scheme_eligibility_df,
+#     group_name_col="AnnualConsumptionProfile",
+#     total_size_col="ArchetypeSize",
+#     eligible_size_col="WHDEligibleSize",
+# )
 
-# Scale eligible group sizes down to WHD core target recipients
-scaling_factor = whd_core_target_recipients / total_whd_group
-scaling_factor_remainder = 1 - scaling_factor
-scaled_whd_sizes = {
-    k: {
-        True: (v[True] * scaling_factor),
-        False: v[False] + (v[True] * scaling_factor_remainder),
-    }
-    for k, v in whd_sizes.items()
-}
+# # Scale eligible group sizes down to WHD core target recipients
+# scaling_factor = whd_core_target_recipients / total_whd_group
+# scaling_factor_remainder = 1 - scaling_factor
+# scaled_whd_sizes = {
+#     k: {
+#         True: (v[True] * scaling_factor),
+#         False: v[False] + (v[True] * scaling_factor_remainder),
+#     }
+#     for k, v in whd_sizes.items()
+# }
 
 # %% [markdown]
 # ### Price cap period n = 0: July - September 2023
@@ -464,7 +482,7 @@ price_cap_1_consumers = ConsumerCollection.from_dataframe(
 )
 
 price_cap_1_consumers = price_cap_1_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+    "electricity", -150, "flat adjustment", inplace=False
 )
 
 # %%
@@ -496,9 +514,6 @@ rebalanced_price_cap_1_consumers = (
         "gas", unit_discount_gas, "unit discount", inplace=False
     )
 )
-
-# %%
-rebalanced_price_cap_1_consumers["Typical", True][0].combined_fuel_bill
 
 # %% [markdown]
 # ### Price cap period n = 2: January - March 2024
@@ -652,7 +667,7 @@ price_cap_2_consumers = ConsumerCollection.from_dataframe(
 )
 
 price_cap_2_consumers = price_cap_2_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+    "electricity", -150, "flat adjustment", inplace=False
 )
 
 # %%
@@ -896,7 +911,7 @@ price_cap_3_consumers = ConsumerCollection.from_dataframe(
 )
 
 price_cap_3_consumers = price_cap_3_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+    "electricity", -150, "flat adjustment", inplace=False
 )
 
 # %%
@@ -1128,7 +1143,7 @@ price_cap_4_consumers = ConsumerCollection.from_dataframe(
 )
 
 price_cap_4_consumers = price_cap_4_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+    "electricity", -150, "flat adjustment", inplace=False
 )
 
 # %%
@@ -1612,18 +1627,11 @@ plt.show()
 # %%
 price_caps_lookup = {
     price_cap_0: "July - September 2023",
-    price_cap_1: "October to December 2023",
-    price_cap_2: "January to March 2024",
-    price_cap_3: "April to June 2024",
-    price_cap_4: "July to September 2024",
+    price_cap_1: "October - December 2023",
+    price_cap_2: "January - March 2024",
+    price_cap_3: "April - June 2024",
+    price_cap_4: "July - September 2024",
 }
-
-# %%
-# Price cap 0
-price_cap_0_df = price_cap_0_consumers.tidy_summary_consumers(
-    scenario_name="Status quo"
-)
-price_cap_0_df["Price cap period"] = price_caps_lookup.get(price_cap_0)
 
 
 # %%
@@ -1639,16 +1647,25 @@ def make_dataframe_summary(
             ),
         ]
     )
-    price_cap_df["Price cap period"] = price_caps_lookup.get(price_cap)
+    price_cap_df["PriceCapPeriod"] = price_caps_lookup.get(price_cap)
     return price_cap_df
 
+
+# %%
+# Price cap 0
+price_cap_0_df = make_dataframe_summary(
+    price_cap_0_consumers,
+    price_cap_0_consumers,
+    "Rebalanced",
+    price_cap_0,
+)
 
 # %%
 # Price cap 1
 price_cap_1_df = make_dataframe_summary(
     price_cap_1_consumers,
     rebalanced_price_cap_1_consumers,
-    "Rebalance FiT to gas",
+    "Rebalanced",
     price_cap_1,
 )
 
@@ -1657,7 +1674,7 @@ price_cap_1_df = make_dataframe_summary(
 price_cap_2_df = make_dataframe_summary(
     price_cap_2_consumers,
     rebalanced_price_cap_2_consumers,
-    "Rebalance FiT to gas",
+    "Rebalanced",
     price_cap_2,
 )
 
@@ -1666,7 +1683,7 @@ price_cap_2_df = make_dataframe_summary(
 price_cap_3_df = make_dataframe_summary(
     price_cap_3_consumers,
     rebalanced_price_cap_3_consumers,
-    "Rebalance FiT and 1/2 RO to gas",
+    "Rebalanced",
     price_cap_3,
 )
 
@@ -1675,7 +1692,7 @@ price_cap_3_df = make_dataframe_summary(
 price_cap_4_df = make_dataframe_summary(
     price_cap_4_consumers,
     rebalanced_price_cap_4_consumers,
-    "Rebalance FiT and RO to gas",
+    "Rebalanced",
     price_cap_4,
 )
 
@@ -1686,34 +1703,245 @@ price_caps_df = pd.concat(
 
 # %%
 summary_df = price_caps_df.pivot_table(
-    index=["Name", "Eligible for support", "Price cap period", "Scenario"],
+    index=["Name", "Eligible for support", "PriceCapPeriod", "Scenario"],
     columns="Attribute",
     values="Value",
     aggfunc="first",
 ).reset_index()
 
-# %%
 summary_df = summary_df[
     [
         "Name",
         "Eligible for support",
         "main_heating_fuel",
-        "Price cap period",
+        "PriceCapPeriod",
         "Scenario",
         "combined_fuel_bill",
     ]
 ]
 
 # %%
-# Need to add eligible/ineligible group sizes (Scaled WHD when Scenario = Status quo, CWP when Scenario != Status quo)
+# Add column for period index number
+period_lookup = {
+    "July - September 2023": 0,
+    "October - December 2023": 1,
+    "January - March 2024": 2,
+    "April - June 2024": 3,
+    "July - September 2024": 4,
+}
+summary_df["Period number"] = summary_df["PriceCapPeriod"].apply(
+    lambda x: period_lookup.get(x)
+)
+summary_df["Period number"] = summary_df["Period number"].astype(int)
 
 # %%
-summary_df
+# Group sizes
+ofgem_archetypes_scheme_eligibility_df = data.ofgem_archetypes_scheme_eligibility()
+
+# Warm Home Discount sizes
+
+# Core target recipients change each price cap period because revenue changes
+whd_industry_initiatives = 50_000_000
+whd_core_target_recipients = {
+    price_caps_lookup.get(price_cap_0): (
+        price_cap_0_pc["whd"].revenue - whd_industry_initiatives
+    )
+    / 150,
+    price_caps_lookup.get(price_cap_1): (
+        price_cap_1_pc["whd"].revenue - whd_industry_initiatives
+    )
+    / 150,
+    price_caps_lookup.get(price_cap_2): (
+        price_cap_2_pc["whd"].revenue - whd_industry_initiatives
+    )
+    / 150,
+    price_caps_lookup.get(price_cap_3): (
+        price_cap_3_pc["whd"].revenue - whd_industry_initiatives
+    )
+    / 150,
+    price_caps_lookup.get(price_cap_4): (
+        price_cap_4_pc["whd"].revenue - whd_industry_initiatives
+    )
+    / 150,
+}
+
+total_whd_group = ofgem_archetypes_scheme_eligibility_df["WHDEligibleSize"].sum()
+whd_sizes = create_eligibility_group_sizes_dictionary(
+    df=ofgem_archetypes_scheme_eligibility_df,
+    group_name_col="AnnualConsumptionProfile",
+    total_size_col="ArchetypeSize",
+    eligible_size_col="WHDEligibleSize",
+)
+
+# Scale eligible group sizes down to WHD core target recipients
+scaled_whd_sizes = {}
+for price_cap, recipient_size in whd_core_target_recipients.items():
+    scaling_factor = recipient_size / total_whd_group
+    scaling_factor_remainder = 1 - scaling_factor
+    scaled_whd_sizes[price_cap] = {
+        k: {
+            True: (v[True] * scaling_factor),
+            False: v[False] + (v[True] * scaling_factor_remainder),
+        }
+        for k, v in whd_sizes.items()
+    }
+
+# Cold Weather Payment sizes
+cwp_sizes_constant = create_eligibility_group_sizes_dictionary(
+    df=ofgem_archetypes_scheme_eligibility_df,
+    group_name_col="AnnualConsumptionProfile",
+    total_size_col="ArchetypeSize",
+    eligible_size_col="CWPEligibleSize",
+)
+cwp_sizes = {}
+for price_cap in whd_core_target_recipients.keys():
+    cwp_sizes[price_cap] = cwp_sizes_constant
+
+# Group size look-up
+eligibility_size_lookup = {"WHD": scaled_whd_sizes, "CWP": cwp_sizes}
+
+# Add eligibility group type column
+summary_df["Eligibility"] = summary_df.apply(
+    lambda row: (
+        "WHD"
+        if row["Scenario"] == "Status quo"
+        else (
+            "WHD"
+            if row["Scenario"] == "Rebalanced" and row["Period number"] == 0
+            else "CWP"
+        )
+    ),
+    axis=1,
+)
+
+# Rename columns for easier processing
+summary_df = summary_df.rename(columns={"Eligible for support": "EligibleForSupport"})
 
 # %%
-
+# Add group size value based on eligibility group and price cap period
+group_sizes = []
+for row in summary_df.itertuples(index=False):
+    size = (
+        eligibility_size_lookup.get(row.Eligibility)
+        .get(row.PriceCapPeriod)
+        .get(row.Name)
+        .get(row.EligibleForSupport)
+    )
+    group_sizes.append(size)
+summary_df.loc[:, "GroupSize"] = group_sizes
 
 # %%
+# Add column for change in bill with respect to previous price cap period
+summary_df = summary_df.sort_values(
+    by=["Name", "EligibleForSupport", "Scenario", "Period number"]
+)
 
+summary_df["Bill change from previous price cap period"] = summary_df.groupby(
+    ["Name", "EligibleForSupport", "Scenario"]
+)["combined_fuel_bill"].diff()
+
+# %% [markdown]
+# Grouped results: Bill value
 
 # %%
+# Minimum, maximum and weighted averages for
+# (i) gas-using households, eligible for support,
+# (ii) gas-using households, ineligible for support,
+# (iii) all others
+
+# Create new Grouping column
+summary_df["Grouping"] = summary_df.apply(
+    lambda row: (
+        "Eligible gas"
+        if row["EligibleForSupport"] and row["main_heating_fuel"] == "Gas"
+        else (
+            "Ineligible gas"
+            if not row["EligibleForSupport"] and row["main_heating_fuel"] == "Gas"
+            else "All other"
+        )
+    ),
+    axis=1,
+)
+
+# %%
+# Get minimum, maximum and weighted average bill value for each scenario, period number and grouping
+bill_agg_df = (
+    summary_df.groupby(["Scenario", "Period number", "PriceCapPeriod", "Grouping"])
+    .agg(
+        Minimum=("combined_fuel_bill", "min"),
+        Maximum=("combined_fuel_bill", "max"),
+        Weighted_Average=(
+            "combined_fuel_bill",
+            lambda x: (x * summary_df.loc[x.index, "GroupSize"]).sum()
+            / summary_df.loc[x.index, "GroupSize"].sum(),
+        ),
+    )
+    .reset_index()
+)
+
+# Reshape
+grouped_bill_summary_df = bill_agg_df.melt(
+    id_vars=["Scenario", "Period number", "PriceCapPeriod", "Grouping"],
+    var_name="Statistic",
+    value_name="Annual energy bill",
+)
+
+# Rename columns for clarity
+grouped_bill_summary_df.rename(
+    columns={"PriceCapPeriod": "Price cap period"}, inplace=True
+)
+
+# %% [markdown]
+# Grouped results: Bill change from previous price cap period
+
+# %% [markdown]
+# I think this is redundant, we can just use the weighted average bill values and use the changes of those.
+
+# %%
+# # Get minimum, maximum and weighted average bill change for each scenario, period number and grouping
+# change_agg_df = (
+#     summary_df.groupby(["Scenario", "Period number", "PriceCapPeriod", "Grouping"])
+#     .agg(
+#         Minimum=("Bill change from previous price cap period", "min"),
+#         Maximum=("Bill change from previous price cap period", "max"),
+#         Weighted_Average=(
+#             "Bill change from previous price cap period",
+#             lambda x: (x * summary_df.loc[x.index, "GroupSize"]).sum()
+#             / summary_df.loc[x.index, "GroupSize"].sum(),
+#         ),
+#     )
+#     .reset_index()
+# )
+
+# # Reshape
+# grouped_change_summary_df = change_agg_df.melt(
+#     id_vars=["Scenario", "Period number", "PriceCapPeriod", "Grouping"],
+#     var_name="Statistic",
+#     value_name="Bill change from previous price cap period",
+# )
+
+# # Rename columns for clarity
+# grouped_change_summary_df.rename(
+#     columns={"PriceCapPeriod": "Price cap period"}, inplace=True
+# )
+
+# %%
+# Saving to Excel
+today = datetime.now()
+date_str = today.strftime("%Y%m%d")
+filename = f"{PROJECT_DIR}/outputs/data/{date_str}_phasing_results.xlsx"
+
+try:
+    with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
+        # Write each DataFrame to a different sheet
+        summary_df.to_excel(writer, sheet_name="Archetype bills", index=False)
+        grouped_bill_summary_df.to_excel(
+            writer, sheet_name="Grouped bills", index=False
+        )
+        # grouped_change_summary_df.to_excel(
+        #     writer, sheet_name="Grouped bill changes", index=False
+        # )
+
+    print("Raw results data successfully written to Excel file.")
+except Exception as e:
+    print(f"Failed to write Excel file: {e}")
