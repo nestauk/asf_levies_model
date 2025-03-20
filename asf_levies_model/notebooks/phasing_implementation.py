@@ -25,7 +25,8 @@
 # - n = 4. Jul-Sep 2024 (price cap fall) (phase rebalancing: moved FiT to gas, move all of RO to gas)
 #
 # **How to phase changes to support**
-# ### TO BE WORKED OUT
+#
+# Increases to WHD revenue at each phase reflects the proportion of the revenue moved from electricity to gas in the phase out of all revenue to be moved. This is then applied to the difference between status quo whd core spending and the desired whd core spending of £1.6bn. Unit discounts are then calculated from that whd revenue total for the phase.
 
 # %% [markdown]
 # ### Set up
@@ -67,6 +68,48 @@ total_supply_elec = (
 )
 
 ofgem_archetypes_df = data.ofgem_archetypes_data()
+
+target_whd_core_spend = 1_600_000_000
+whd_industry_initiatives = 50_000_000
+
+# Pinning target recipients to value at time 0
+whd_core_target_recipients = (545_000_000 - whd_industry_initiatives) / 150
+
+# %% [markdown]
+# **Scheme Eligibility Sizes**
+
+# %%
+# Load CWP sizes
+ofgem_archetypes_scheme_eligibility_df = data.ofgem_archetypes_scheme_eligibility()
+total_cwp_group = ofgem_archetypes_scheme_eligibility_df["CWPEligibleSize"].sum()
+
+cwp_sizes = create_eligibility_group_sizes_dictionary(
+    df=ofgem_archetypes_scheme_eligibility_df,
+    group_name_col="AnnualConsumptionProfile",
+    total_size_col="ArchetypeSize",
+    eligible_size_col="CWPEligibleSize",
+)
+
+# WHD eligibility sizes
+# For scenario description purposes only
+total_whd_group = ofgem_archetypes_scheme_eligibility_df["WHDEligibleSize"].sum()
+whd_sizes = create_eligibility_group_sizes_dictionary(
+    df=ofgem_archetypes_scheme_eligibility_df,
+    group_name_col="AnnualConsumptionProfile",
+    total_size_col="ArchetypeSize",
+    eligible_size_col="WHDEligibleSize",
+)
+
+# Scale eligible group sizes down to WHD core target recipients
+scaling_factor = whd_core_target_recipients / total_whd_group
+scaling_factor_remainder = 1 - scaling_factor
+scaled_whd_sizes = {
+    k: {
+        True: (v[True] * scaling_factor),
+        False: v[False] + (v[True] * scaling_factor_remainder),
+    }
+    for k, v in whd_sizes.items()
+}
 
 # %% [markdown]
 # ### Price cap period n = 0: July - September 2023
@@ -269,6 +312,87 @@ rebalanced_price_cap_1_pc = price_cap_1_pc.rebalance_levies(
 )
 
 # %% [markdown]
+# Support: Proportional Increase to WHD Revenue
+
+# %%
+# FiT proportion of proposed rebalancing
+rebalanced_price_cap_1_support_prop = rebalanced_price_cap_1_pc["fit"].revenue / (
+    rebalanced_price_cap_1_pc["fit"].revenue + rebalanced_price_cap_1_pc["ro"].revenue
+)
+rebalanced_price_cap_1_support_prop
+
+# %%
+# Price cap difference in WHD to target.
+
+# Calculate additional whd revenue commitment as:
+# (target whd core spend - current whd core spend) * rebalancing proportion
+rebalanced_price_cap_1_additional_whd_revenue = (
+    target_whd_core_spend
+    - (rebalanced_price_cap_1_pc["whd"].revenue - whd_industry_initiatives)
+) * rebalanced_price_cap_1_support_prop
+rebalanced_price_cap_1_additional_whd_revenue
+
+# %%
+# Update the whd revenue
+rebalanced_price_cap_1_pc = rebalanced_price_cap_1_pc.update_revenues(
+    {
+        "whd": rebalanced_price_cap_1_pc["whd"].revenue
+        + rebalanced_price_cap_1_additional_whd_revenue
+    }
+)
+
+# %%
+# new levy rates
+price_cap_1_pc["whd"].electricity_fixed_rate, rebalanced_price_cap_1_pc[
+    "whd"
+].electricity_fixed_rate
+
+# %% [markdown]
+# Support: Calculate Discount rate
+
+# %%
+# Estimate total electricity and gas consumption of all eligible households across archetypes
+# NB doesn't matter which consumers we use for this as they're constant over the model.
+# as a result, we also only need to do this bit once.
+cwp_recipients_electricity_consumption = sum(
+    consumer.electricity_consumption * cwp_sizes[consumer.archetype][True]
+    for consumer in price_cap_0_consumers.iter_eligible()
+)
+cwp_recipients_gas_consumption = sum(
+    consumer.gas_consumption * cwp_sizes[consumer.archetype][True]
+    for consumer in price_cap_0_consumers.iter_eligible()
+)
+
+# Portion WHD core spend for discounting electricity consumption and for discounting gas consumption
+cwp_core_target_spending_electricity_weight = cwp_recipients_electricity_consumption / (
+    cwp_recipients_electricity_consumption + cwp_recipients_gas_consumption
+)
+cwp_core_target_spending_gas_weight = cwp_recipients_gas_consumption / (
+    cwp_recipients_electricity_consumption + cwp_recipients_gas_consumption
+)
+
+# %%
+# Allocate spending to electricity and gas discount
+core_target_spending_electricity = (
+    rebalanced_price_cap_1_pc["whd"].revenue - whd_industry_initiatives
+) * cwp_core_target_spending_electricity_weight
+core_target_spending_gas = (
+    rebalanced_price_cap_1_pc["whd"].revenue - whd_industry_initiatives
+) * cwp_core_target_spending_gas_weight
+
+# Calculate unit discounts for electricity and gas
+unit_discount_electricity = (
+    (core_target_spending_electricity) / cwp_recipients_electricity_consumption
+) * 1.05  # adding VAT to discount
+unit_discount_gas = (
+    core_target_spending_gas / cwp_recipients_gas_consumption * 1.05
+)  # adding VAT to discount
+
+# %%
+# 1.14p per kwh discount
+print(unit_discount_electricity, unit_discount_gas)
+
+# %% [markdown]
 # **3. Set up tariffs**
 
 # %% [markdown]
@@ -294,7 +418,7 @@ price_cap_1_gas_tariff = gas_tariff.update_policy_costs(price_cap_1_pc)
 price_cap_1_electricity_tariff = electricity_tariff.update_policy_costs(price_cap_1_pc)
 
 # %%
-# Check price cap in Annex 9 (£18304.02)
+# Check price cap in Annex 9 (£1834.02)
 price_cap_1_gas_tariff.calculate_total_consumption(
     11.5, vat=True
 ) + price_cap_1_electricity_tariff.calculate_total_consumption(2.7, vat=True)
@@ -339,7 +463,7 @@ price_cap_1_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-price_cap_1_consumers.apply_support_to_eligible_consumers(
+price_cap_1_consumers = price_cap_1_consumers.apply_support_to_eligible_consumers(
     "electricity", -150, "flat adjustment", inplace=True
 )
 
@@ -362,9 +486,19 @@ rebalanced_price_cap_1_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-rebalanced_price_cap_1_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+rebalanced_price_cap_1_consumers = (
+    rebalanced_price_cap_1_consumers.apply_support_to_eligible_consumers(
+        "electricity",
+        unit_discount_electricity,
+        "unit discount",
+        inplace=False,
+    ).apply_support_to_eligible_consumers(
+        "gas", unit_discount_gas, "unit discount", inplace=False
+    )
 )
+
+# %%
+rebalanced_price_cap_1_consumers["Typical", True][0].combined_fuel_bill
 
 # %% [markdown]
 # ### Price cap period n = 2: January - March 2024
@@ -435,6 +569,21 @@ rebalanced_price_cap_2_pc = price_cap_2_pc.rebalance_levies(
 )
 
 # %% [markdown]
+# Support: Update WHD revenue
+
+# %%
+# Update the whd revenue
+# assume underlying revenue doesn't change between price caps (it doesn't in this case)
+rebalanced_price_cap_2_pc = rebalanced_price_cap_2_pc.update_revenues(
+    {"whd": rebalanced_price_cap_1_pc["whd"].revenue}
+)
+
+# %% [markdown]
+# Support: Unit discount rates
+#
+# Carried over from prior price cap, no change.
+
+# %% [markdown]
 # **3. Set up tariffs**
 
 # %%
@@ -502,7 +651,7 @@ price_cap_2_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-price_cap_2_consumers.apply_support_to_eligible_consumers(
+price_cap_2_consumers = price_cap_2_consumers.apply_support_to_eligible_consumers(
     "electricity", -150, "flat adjustment", inplace=True
 )
 
@@ -525,8 +674,15 @@ rebalanced_price_cap_2_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-rebalanced_price_cap_2_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+rebalanced_price_cap_2_consumers = (
+    rebalanced_price_cap_2_consumers.apply_support_to_eligible_consumers(
+        "electricity",
+        unit_discount_electricity,
+        "unit discount",
+        inplace=False,
+    ).apply_support_to_eligible_consumers(
+        "gas", unit_discount_gas, "unit discount", inplace=False
+    )
 )
 
 # %% [markdown]
@@ -614,6 +770,61 @@ rebalanced_price_cap_3_pc = price_cap_3_pc.rebalance_levies(
 )
 
 # %% [markdown]
+# Support: Calculate WHD revenue
+
+# %%
+# FiT proportion of proposed rebalancing
+rebalanced_price_cap_3_support_prop = (
+    rebalanced_price_cap_3_pc["fit"].revenue
+    + (rebalanced_price_cap_3_pc["ro"].revenue * 0.5)
+) / (rebalanced_price_cap_3_pc["fit"].revenue + rebalanced_price_cap_3_pc["ro"].revenue)
+rebalanced_price_cap_3_support_prop
+
+# %%
+# Calculate additional whd revenue commitment as:
+# (target whd core spend - status quo whd core spend) * rebalancing proportion
+rebalanced_price_cap_3_additional_whd_revenue = (
+    target_whd_core_spend - (price_cap_3_pc["whd"].revenue - whd_industry_initiatives)
+) * rebalanced_price_cap_3_support_prop
+rebalanced_price_cap_3_additional_whd_revenue
+
+# %%
+# Update the whd revenue
+rebalanced_price_cap_3_pc = rebalanced_price_cap_3_pc.update_revenues(
+    {
+        "whd": price_cap_3_pc["whd"].revenue
+        + rebalanced_price_cap_3_additional_whd_revenue
+    }
+)
+rebalanced_price_cap_3_pc["whd"].revenue
+
+# %% [markdown]
+# Support: Calculate discount rate
+
+# %%
+# Allocate spending to electricity and gas discount
+core_target_spending_electricity = (
+    rebalanced_price_cap_3_pc["whd"].revenue - whd_industry_initiatives
+) * cwp_core_target_spending_electricity_weight
+core_target_spending_gas = (
+    rebalanced_price_cap_3_pc["whd"].revenue - whd_industry_initiatives
+) * cwp_core_target_spending_gas_weight
+
+# %%
+# Calculate unit discounts for electricity and gas
+unit_discount_electricity = (
+    (core_target_spending_electricity) / cwp_recipients_electricity_consumption
+) * 1.05  # adding VAT to discount
+unit_discount_gas = (
+    core_target_spending_gas / cwp_recipients_gas_consumption * 1.05
+)  # adding VAT to discount
+
+
+# %%
+# 1.86p per kwh discount
+print(unit_discount_electricity, unit_discount_gas)
+
+# %% [markdown]
 # **3. Set up tariffs**
 
 # %% [markdown]
@@ -684,7 +895,7 @@ price_cap_3_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-price_cap_3_consumers.apply_support_to_eligible_consumers(
+price_cap_3_consumers = price_cap_3_consumers.apply_support_to_eligible_consumers(
     "electricity", -150, "flat adjustment", inplace=True
 )
 
@@ -707,8 +918,15 @@ rebalanced_price_cap_3_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-rebalanced_price_cap_3_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+rebalanced_price_cap_3_consumers = (
+    rebalanced_price_cap_3_consumers.apply_support_to_eligible_consumers(
+        "electricity",
+        unit_discount_electricity,
+        "unit discount",
+        inplace=False,
+    ).apply_support_to_eligible_consumers(
+        "gas", unit_discount_gas, "unit discount", inplace=False
+    )
 )
 
 # %% [markdown]
@@ -795,6 +1013,49 @@ rebalanced_price_cap_4_pc = price_cap_4_pc.rebalance_levies(
     rebalancing_weights_fit_ro, scenario_name="rebalance_fit_ro_to_gas"
 )
 
+# %%
+rebalanced_price_cap_4_additional_whd_revenue = (
+    target_whd_core_spend - (price_cap_4_pc["whd"].revenue - whd_industry_initiatives)
+) * 1
+rebalanced_price_cap_4_additional_whd_revenue
+
+# %%
+rebalanced_price_cap_4_pc = rebalanced_price_cap_4_pc.update_revenues(
+    {"whd": target_whd_core_spend + whd_industry_initiatives}
+)
+
+# %%
+# new levy rates
+price_cap_4_pc["whd"].electricity_fixed_rate, rebalanced_price_cap_4_pc[
+    "whd"
+].electricity_fixed_rate
+
+# %% [markdown]
+# Support: Calculate discount rate
+
+# %%
+# Allocate spending to electricity and gas discount
+core_target_spending_electricity = (
+    rebalanced_price_cap_4_pc["whd"].revenue - whd_industry_initiatives
+) * cwp_core_target_spending_electricity_weight
+core_target_spending_gas = (
+    rebalanced_price_cap_4_pc["whd"].revenue - whd_industry_initiatives
+) * cwp_core_target_spending_gas_weight
+
+
+# %%
+# Calculate unit discounts for electricity and gas
+unit_discount_electricity = (
+    (core_target_spending_electricity) / cwp_recipients_electricity_consumption
+) * 1.05  # adding VAT to discount
+unit_discount_gas = (
+    core_target_spending_gas / cwp_recipients_gas_consumption * 1.05
+)  # adding VAT to discount
+
+# %%
+# 2.57p per kwh discount
+print(unit_discount_electricity, unit_discount_gas)
+
 # %% [markdown]
 # **3. Set up tariffs**
 
@@ -866,7 +1127,7 @@ price_cap_4_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-price_cap_4_consumers.apply_support_to_eligible_consumers(
+price_cap_4_consumers = price_cap_4_consumers.apply_support_to_eligible_consumers(
     "electricity", -150, "flat adjustment", inplace=True
 )
 
@@ -889,8 +1150,15 @@ rebalanced_price_cap_4_consumers = ConsumerCollection.from_dataframe(
     model_eligibility_sets=True,
 )
 
-rebalanced_price_cap_4_consumers.apply_support_to_eligible_consumers(
-    "electricity", -150, "flat adjustment", inplace=True
+rebalanced_price_cap_4_consumers = (
+    rebalanced_price_cap_4_consumers.apply_support_to_eligible_consumers(
+        "electricity",
+        unit_discount_electricity,
+        "unit discount",
+        inplace=False,
+    ).apply_support_to_eligible_consumers(
+        "gas", unit_discount_gas, "unit discount", inplace=False
+    )
 )
 
 # %% [markdown]
