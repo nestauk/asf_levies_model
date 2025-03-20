@@ -350,11 +350,11 @@ scenario_2_unit_discount_gas = 19  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_2_core_target_spending_electricity = (
-    scenario_2_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_2_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_2_core_target_spending_gas = (
-    scenario_2_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_2_unit_discount_electricity / 1.05
+) * cwp_recipients_gas_consumption
 scenario_2_new_whd_core = (
     scenario_2_core_target_spending_electricity + scenario_2_core_target_spending_gas
 )
@@ -410,11 +410,11 @@ scenario_3_unit_discount_gas = 17  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_3_core_target_spending_electricity = (
-    scenario_3_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_3_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_3_core_target_spending_gas = (
-    scenario_3_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_3_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
 scenario_3_new_whd_core = (
     scenario_3_core_target_spending_electricity + scenario_3_core_target_spending_gas
 )
@@ -483,16 +483,16 @@ scenario_3_consumers_unit_discount = (
 """
 
 # Define unit discounts
-scenario_4_unit_discount_electricity = 17  # £/MWh, inclusive of VAT
-scenario_4_unit_discount_gas = 17  # £/MWh, inclusive of VAT
+scenario_4_unit_discount_electricity = 15  # £/MWh, inclusive of VAT
+scenario_4_unit_discount_gas = 15  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_4_core_target_spending_electricity = (
-    scenario_4_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_4_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_4_core_target_spending_gas = (
-    scenario_4_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_4_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
 scenario_4_new_whd_core = (
     scenario_4_core_target_spending_electricity + scenario_4_core_target_spending_gas
 )
@@ -563,16 +563,16 @@ scenario_4_consumers_unit_discount = (
 """
 
 # Define unit discounts
-scenario_5_unit_discount_electricity = 16  # £/MWh, inclusive of VAT
-scenario_5_unit_discount_gas = 16  # £/MWh, inclusive of VAT
+scenario_5_unit_discount_electricity = 13  # £/MWh, inclusive of VAT
+scenario_5_unit_discount_gas = 13  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_5_core_target_spending_electricity = (
-    scenario_5_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_5_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_5_core_target_spending_gas = (
-    scenario_5_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_5_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
 scenario_5_new_whd_core = (
     scenario_5_core_target_spending_electricity + scenario_5_core_target_spending_gas
 )
@@ -744,11 +744,11 @@ scenario_7_unit_discount_gas = 16  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_7_core_target_spending_electricity = (
-    scenario_7_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_7_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_7_core_target_spending_gas = (
-    scenario_7_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_7_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
 scenario_7_new_whd_core = (
     scenario_7_core_target_spending_electricity + scenario_7_core_target_spending_gas
 )
@@ -804,11 +804,11 @@ scenario_8_unit_discount_gas = 15  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_8_core_target_spending_electricity = (
-    scenario_8_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_8_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_8_core_target_spending_gas = (
-    scenario_8_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_8_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
 scenario_8_new_whd_core = (
     scenario_8_core_target_spending_electricity + scenario_8_core_target_spending_gas
 )
@@ -882,11 +882,11 @@ scenario_9_unit_discount_gas = 14  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_9_core_target_spending_electricity = (
-    scenario_9_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_9_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_9_core_target_spending_gas = (
-    scenario_9_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_9_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
 scenario_9_new_whd_core = (
     scenario_9_core_target_spending_electricity + scenario_9_core_target_spending_gas
 )
@@ -962,11 +962,11 @@ scenario_10_unit_discount_gas = 11  # £/MWh, inclusive of VAT
 
 # Calculate spending
 scenario_10_core_target_spending_electricity = (
-    scenario_10_unit_discount_electricity * cwp_recipients_electricity_consumption
-)
+    scenario_10_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
 scenario_10_core_target_spending_gas = (
-    scenario_10_unit_discount_gas * cwp_recipients_gas_consumption
-)
+    scenario_10_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
 scenario_10_new_whd_core = (
     scenario_10_core_target_spending_electricity + scenario_10_core_target_spending_gas
 )

@@ -750,9 +750,9 @@ unit_discount_gas = 19
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -908,9 +908,9 @@ unit_discount_gas = 23
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -1069,9 +1069,9 @@ unit_discount_gas = 17
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -1249,9 +1249,9 @@ unit_discount_gas = 22
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -1427,14 +1427,14 @@ print(str((new_whd_core + whd_industry_initiatives) / 1e9), "billion")
 
 # %%
 # Define unit discounts for electricity and gas - EXPERIMENT
-unit_discount_electricity = 16
-unit_discount_gas = 16
+unit_discount_electricity = 15
+unit_discount_gas = 15
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -1611,12 +1611,11 @@ print(str((new_whd_core + whd_industry_initiatives) / 1e9), "billion")
 # Define unit discounts for electricity and gas - EXPERIMENT
 unit_discount_electricity = 20
 unit_discount_gas = 20
-
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -1794,14 +1793,14 @@ print(str((new_whd_core + whd_industry_initiatives) / 1e9), "billion")
 
 # %%
 # Define unit discounts for electricity and gas - EXPERIMENT
-unit_discount_electricity = 25.7 / 1.05
-unit_discount_gas = 25.7 / 1.05
+unit_discount_electricity = 13
+unit_discount_gas = 13
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -1979,9 +1978,9 @@ unit_discount_gas = 17
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -2358,9 +2357,9 @@ unit_discount_gas = 16
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -2546,9 +2545,9 @@ unit_discount_gas = 20
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -2737,9 +2736,9 @@ unit_discount_gas = 15
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -2935,9 +2934,9 @@ unit_discount_gas = 14
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -3141,9 +3140,9 @@ unit_discount_gas = 11
 
 # Allocate spending to electricity and gas discount
 core_target_spending_electricity = (
-    unit_discount_electricity * cwp_recipients_electricity_consumption
-)
-core_target_spending_gas = unit_discount_gas * cwp_recipients_gas_consumption
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
 
 # Calculate needed spending
 new_whd_core = core_target_spending_electricity + core_target_spending_gas
@@ -3331,5 +3330,8 @@ print(str((new_whd_core + whd_industry_initiatives) / 1e9), "billion")
         * base_half_whd_delete_eco_pc["eco4"].revenue
     )
 ) / 1e9
+
+# %%
+
 
 # %%
