@@ -130,6 +130,30 @@ fileobject.close()
 gas_tariff = gas_tariff.update_policy_costs(pc)
 electricity_tariff = electricity_tariff.update_policy_costs(pc)
 
+"""
+000. Create Average Consumer
+"""
+# Create a status quo WHD rebate ConsumerCollection
+
+ofgem_archetypes_df = data.ofgem_archetypes_data()
+
+average_consumers = ConsumerCollection.from_dataframe(
+    collection_name="Status quo",
+    df=ofgem_archetypes_df,
+    rows=range(1, 25),
+    name_col="AnnualConsumptionProfile",
+    archetype_col="AnnualConsumptionProfile",
+    net_annual_income_col="NetAnnualHouseholdIncome",
+    net_income_decile_col="NetIncomeDecile",
+    main_heating_fuel_col="ArchetypeHeatingFuel",
+    gas_consumption_col="GaskWh",
+    electricity_consumption_col="ElectricitySingleRatekWh",
+    gas_tariff=None,
+    electricity_tariff=None,
+    unmetered_fuel_spend_col="UnmeteredFuelSpend",
+    unit_converter=1_000,
+    model_eligibility_sets=True,
+)
 
 """
 00. Status quo
@@ -312,11 +336,11 @@ CWP discount parameters
 # Estimate total electricity and gas consumption of all eligible households across archetypes
 cwp_recipients_electricity_consumption = sum(
     consumer.electricity_consumption * cwp_sizes[consumer.archetype][True]
-    for consumer in status_quo_consumers.iter_eligible()
+    for consumer in average_consumers.iter_eligible()
 )
 cwp_recipients_gas_consumption = sum(
     consumer.gas_consumption * cwp_sizes[consumer.archetype][True]
-    for consumer in status_quo_consumers.iter_eligible()
+    for consumer in average_consumers.iter_eligible()
 )
 
 """
