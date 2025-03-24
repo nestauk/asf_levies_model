@@ -1,3 +1,21 @@
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     comment_magics: true
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: asf_levies_model
+#     language: python
+#     name: python3
+# ---
+
 # %%
 import pandas as pd
 from datetime import datetime
@@ -282,6 +300,17 @@ for levy in pc[["ro", "fit"]]:
         "new_fixed_weight_gas": levy.electricity_fixed_weight,
     }
 
+for levy in pc[["gbis", "whd"]]:
+    rebalancing_weights[levy.short_name] = {
+        "new_electricity_weight": 0,
+        "new_gas_weight": 0,
+        "new_tax_weight": 1,
+        "new_variable_weight_elec": 0,
+        "new_fixed_weight_elec": 0,
+        "new_variable_weight_gas": 0,
+        "new_fixed_weight_gas": 0,
+    }
+
 # Apply rebalancing to RO and FiT in LevyCollection
 rebalanced_pc = pc.rebalance_levies(
     rebalancing_weights, scenario_name="rebalance_ro_fit_to_gas"
@@ -391,6 +420,10 @@ archetype_sizes = archetype_sizes.rename(
     }
 )
 df = df.merge(archetype_sizes, on="Name", how="left")
+
+# %%
+# Are there any eligible households with a bill rise?
+(df[df["EligibleForSupport"] == True]["Net change in annual energy bill"] > 0).any()
 
 # %%
 # What is the range of bill change for gas-using households?
@@ -2921,6 +2954,9 @@ print(str((new_whd_core + whd_industry_initiatives) / 1e9), "billion")
     )
 ) / 1e9
 
+# %%
+base_half_whd_delete_gbis_pc["gbis"].revenue / 1e9
+
 # %% [markdown]
 # ### Identifying optimal discount value for option 2 with GBIS + 1/3 ECO4 removal
 
@@ -3331,7 +3367,202 @@ print(str((new_whd_core + whd_industry_initiatives) / 1e9), "billion")
     )
 ) / 1e9
 
-# %%
+# %% [markdown]
+# ### Identifying optimal discount value for WHD taxation + remove GBIS
 
+# %% [markdown]
+# Mean consumers
+
+# %%
+# Define unit discounts for electricity and gas - EXPERIMENT
+unit_discount_electricity = 13
+unit_discount_gas = 13
+
+# Allocate spending to electricity and gas discount
+core_target_spending_electricity = (
+    unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+core_target_spending_gas = (unit_discount_gas / 1.05) * cwp_recipients_gas_consumption
+
+# Calculate needed spending
+new_whd_core = core_target_spending_electricity + core_target_spending_gas
+
+# %%
+# Add rebalancing weights for ECO4 to existing rebalancing dictionary for RO, FiT and GBIS
+rebalancing_weights_delete_gbis_whd = copy.deepcopy(rebalancing_weights_delete_gbis)
+rebalancing_weights_delete_gbis_whd["whd"] = {
+    "new_electricity_weight": 0,
+    "new_gas_weight": 0,
+    "new_tax_weight": 1,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 0,
+}
+
+# Apply rebalancing weights
+base_delete_gbis_whd_pc = pc.rebalance_levies(
+    rebalancing_weights_delete_gbis_whd,
+    scenario_name="rebalance_ro_fit_to_gas_gbic_whd_to_tax",
+)
+
+# Update revenue
+base_delete_gbis_whd_pc = base_delete_gbis_whd_pc.update_revenues(
+    {"whd": (new_whd_core + whd_industry_initiatives)}
+)
+
+# Update tariffs
+base_delete_gbis_whd_gas_tariff = gas_tariff.update_policy_costs(
+    base_delete_gbis_whd_pc
+)
+base_delete_gbis_whd_electricity_tariff = electricity_tariff.update_policy_costs(
+    base_delete_gbis_whd_pc
+)
+
+# %%
+# Create ConsumerCollection
+base_delete_gbis_whd_consumers_mean = ConsumerCollection.from_dataframe(
+    collection_name="CORE with GBIS and WHD on taxation",
+    df=ofgem_archetypes_df,
+    rows=range(1, 25),
+    name_col="AnnualConsumptionProfile",
+    archetype_col="AnnualConsumptionProfile",
+    net_annual_income_col="NetAnnualHouseholdIncome",
+    net_income_decile_col="NetIncomeDecile",
+    main_heating_fuel_col="ArchetypeHeatingFuel",
+    gas_consumption_col="GaskWh",
+    electricity_consumption_col="ElectricitySingleRatekWh",
+    gas_tariff=base_delete_gbis_whd_gas_tariff,
+    electricity_tariff=base_delete_gbis_whd_electricity_tariff,
+    unmetered_fuel_spend_col="UnmeteredFuelSpend",
+    unit_converter=1_000,
+    model_eligibility_sets=True,
+)
+
+# Unit discount approach: Gas and electricity
+# Apply support to eligible consumers
+base_delete_gbis_whd_consumers_unit_discount_mean = (
+    base_delete_gbis_whd_consumers_mean.apply_support_to_eligible_consumers(
+        "electricity",
+        unit_discount_electricity,
+        "unit discount",
+        inplace=False,
+    ).apply_support_to_eligible_consumers(
+        "gas", unit_discount_gas, "unit discount", inplace=False
+    )
+)
+
+# %%
+baseline_scenario = "Status quo mean"
+adjusted_scenario = "Base + delete gbis + whd mean"
+consumers_df = pd.concat(
+    [
+        status_quo_consumers_flat_rebate_mean.tidy_summary_consumers(
+            scenario_name=baseline_scenario
+        ),
+        base_delete_gbis_whd_consumers_unit_discount_mean.tidy_summary_consumers(
+            scenario_name=adjusted_scenario
+        ),
+    ]
+)
+
+
+# %%
+master_summary_flourish = consumers_df.pivot_table(
+    index=[
+        "Name",
+        "Scenario",
+        "Eligible for support",
+    ],
+    columns="Attribute",
+    values="Value",
+    aggfunc="first",
+).reset_index()
+master_summary_flourish = master_summary_flourish[
+    [
+        "Name",
+        "Eligible for support",
+        "Scenario",
+        "main_heating_fuel",
+        "combined_fuel_bill",
+    ]
+].sort_values(by=["Name"])
+
+master_summary_flourish = master_summary_flourish.rename(
+    columns={
+        "Eligible for support": "EligibleForSupport",
+    }
+)
+
+master_summary_flourish = master_summary_flourish.copy(deep=True)
+bill_changes = []
+for row in master_summary_flourish.itertuples(index=False):
+    # Get baseline bill
+    baseline_bill = master_summary_flourish.loc[
+        (master_summary_flourish["Name"] == row.Name)
+        & (master_summary_flourish["Scenario"] == baseline_scenario)
+        & (master_summary_flourish["EligibleForSupport"] == row.EligibleForSupport),
+        "combined_fuel_bill",
+    ].values
+    # Ensure a baseline bill exists before subtracting
+    baseline_bill = baseline_bill[0] if len(baseline_bill) > 0 else None
+    # Compute the bill change or assign NaN if no baseline bill found
+    bill_changes.append(
+        row.combined_fuel_bill - baseline_bill if baseline_bill is not None else None
+    )
+master_summary_flourish.loc[:, "Net change in annual energy bill"] = bill_changes
+
+df = master_summary_flourish[master_summary_flourish["Scenario"] == adjusted_scenario]
+df["Eligibility"] = "CWP"
+# Add group sizes
+eligibility_size_lookup = {
+    "CWP": cwp_sizes,
+}
+group_sizes = []
+for row in df.itertuples(index=False):
+    size = (
+        eligibility_size_lookup.get(row.Eligibility)
+        .get(row.Name)
+        .get(row.EligibleForSupport)
+    )
+    group_sizes.append(size)
+df.loc[:, "GroupSize"] = group_sizes
+
+# %%
+# Are there any eligible households with a bill rise?
+(df[df["EligibleForSupport"] == True]["Net change in annual energy bill"] > 0).any()
+
+# %%
+# What is the range of bill change for gas-using households ineligible for support?
+df[(df["EligibleForSupport"] == False) & (df["main_heating_fuel"] == "Gas")][
+    "Net change in annual energy bill"
+].min(), df[(df["EligibleForSupport"] == False) & (df["main_heating_fuel"] == "Gas")][
+    "Net change in annual energy bill"
+].max()
+
+# %%
+# What is the weighted average bill change for gas-using households ineligible for support
+filtered_df = df[
+    (df["EligibleForSupport"] == False) & (df["main_heating_fuel"] == "Gas")
+]
+(
+    filtered_df["Net change in annual energy bill"] * filtered_df["GroupSize"]
+).sum() / filtered_df["GroupSize"].sum()
+
+# %%
+# What is the WHD revenue?
+print(str((new_whd_core + whd_industry_initiatives) / 1e9), "billion")
+
+# %%
+# What is publicly funded?
+(
+    (base_delete_gbis_whd_pc["whd"].tax_weight * base_delete_gbis_whd_pc["whd"].revenue)
+    + (
+        base_delete_gbis_whd_pc["gbis"].tax_weight
+        * base_delete_gbis_whd_pc["gbis"].revenue
+    )
+) / 1e9
+
+# %%
 
 # %%
