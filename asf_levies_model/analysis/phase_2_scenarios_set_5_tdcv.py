@@ -1761,7 +1761,7 @@ Saving raw results data to Excel
 """
 today = datetime.now()
 date_str = today.strftime("%Y%m%d")
-filename = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_tdcv_set_5.xlsx"
+filename = f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_5_tdcv.xlsx"
 
 try:
     with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
@@ -2198,12 +2198,41 @@ bill_range_summary = pd.concat(
     [eligible_gas_summary, ineligible_gas_summary, others_summary]
 )
 
+"""
+Medium TDCV summary table of bills
+"""
+
+medium_tdcv_summary_df = pd.DataFrame()
+for (tariff_electricity, tariff_gas), scenario in tariff_pairs.items():
+    gas_pc = tariff_gas.pc_nil + (tariff_gas.pc * 11.5)
+    electricity_pc = tariff_electricity.pc_nil + (tariff_electricity.pc * 2.7)
+    bill_without_vat = tariff_electricity.calculate_total_consumption(
+        2.7, vat=False
+    ) + tariff_gas.calculate_total_consumption(11.5, vat=False)
+    other_components = bill_without_vat - gas_pc - electricity_pc
+    vat_component = bill_without_vat * 0.05
+    bill_with_vat = tariff_electricity.calculate_total_consumption(
+        2.7, vat=True
+    ) + tariff_gas.calculate_total_consumption(11.5, vat=True)
+    row = pd.DataFrame(
+        [
+            {
+                "Scenario": scenario,
+                "Policy costs levied on gas": gas_pc,
+                "Policy costs levies on electricity": electricity_pc,
+                "Other tariff components": other_components,
+                "VAT": vat_component,
+                "Total bill": bill_with_vat,
+            }
+        ]
+    )
+    medium_tdcv_summary_df = pd.concat([medium_tdcv_summary_df, row], ignore_index=True)
 
 """
 Saving Flourish data tables to Excel
 """
 flourish_filename = (
-    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_tscv_scenarios_set_5_flourish.xlsx"
+    f"{PROJECT_DIR}/outputs/data/{date_str}_phase_2_scenarios_set_5_flourish_tdcv.xlsx"
 )
 try:
     with pd.ExcelWriter(flourish_filename, engine="xlsxwriter") as writer:
@@ -2214,6 +2243,10 @@ try:
         # Bill range summary
         bill_range_summary.to_excel(
             writer, sheet_name="Bill change ranges", index=False
+        )
+        # Medium TDCV bill summary
+        medium_tdcv_summary_df.to_excel(
+            writer, sheet_name="Medium TDCV bills", index=False
         )
         # Individual scenario tables
         i = 1
