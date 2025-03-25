@@ -34,6 +34,7 @@ Scenarios (name of corresponding ConsumerCollection):
    + Remove ECO4 (scenario_10_consumers_unit_discount)
 -- Option 3, original --
 11. Base + Remove ECO (ECO4+GBIS) to general taxation (scenario_11_consumers_unit_discount) <- Same as in Set 4
+12. Base + WHD levy revenue allocation on general taxation + Remove GBIS
 
 """
 
@@ -1186,6 +1187,84 @@ scenario_11_consumers_unit_discount = (
     )
 )
 
+"""
+12. Base + Remove GBIS + WHD to general taxation, with lower unit discount
+"""
+
+# Define unit discounts
+scenario_12_unit_discount_electricity = 13  # £/MWh, inclusive of VAT
+scenario_12_unit_discount_gas = 13  # £/MWh, inclusive of VAT
+
+# Calculate spending
+scenario_12_core_target_spending_electricity = (
+    scenario_12_unit_discount_electricity / 1.05
+) * cwp_recipients_electricity_consumption
+scenario_12_core_target_spending_gas = (
+    scenario_12_unit_discount_gas / 1.05
+) * cwp_recipients_gas_consumption
+scenario_12_new_whd_core = (
+    scenario_12_core_target_spending_electricity + scenario_12_core_target_spending_gas
+)
+
+# Add rebalancing weights for WHD removal to taxation
+rebalancing_weights_delete_gbis_whd = copy.deepcopy(rebalancing_weights_delete_gbis)
+rebalancing_weights_delete_gbis_whd["whd"] = {
+    "new_electricity_weight": 0,
+    "new_gas_weight": 0,
+    "new_tax_weight": 1,
+    "new_variable_weight_elec": 0,
+    "new_fixed_weight_elec": 0,
+    "new_variable_weight_gas": 0,
+    "new_fixed_weight_gas": 0,
+}
+
+# Apply rebalancing weights
+scenario_12_pc = pc.rebalance_levies(
+    rebalancing_weights_delete_gbis_whd,
+    scenario_name="rebalance_ro_fit_to_gas_gbis_to_tax_whd_to_tax",
+)
+
+# Update revenue
+scenario_12_pc = scenario_12_pc.update_revenues(
+    {"whd": (scenario_12_new_whd_core + whd_industry_initiatives)}
+)
+
+# Update tariffs
+scenario_12_gas_tariff = gas_tariff.update_policy_costs(scenario_12_pc)
+scenario_12_electricity_tariff = electricity_tariff.update_policy_costs(scenario_12_pc)
+
+# Create ConsumerCollection
+scenario_12_consumers = ConsumerCollection.from_dataframe(
+    collection_name="Remove GBIS + WHD, with alternative unit discount",
+    df=ofgem_archetypes_df,
+    rows=range(1, 25),
+    name_col="AnnualConsumptionProfile",
+    archetype_col="AnnualConsumptionProfile",
+    net_annual_income_col="NetAnnualHouseholdIncome",
+    net_income_decile_col="NetIncomeDecile",
+    main_heating_fuel_col="ArchetypeHeatingFuel",
+    gas_consumption_col="GaskWh_5PCT",
+    electricity_consumption_col="ElectricitySingleRatekWh_5PCT",
+    gas_tariff=scenario_12_gas_tariff,
+    electricity_tariff=scenario_12_electricity_tariff,
+    unmetered_fuel_spend_col="UnmeteredFuelSpend",
+    unit_converter=1_000,
+    model_eligibility_sets=True,
+)
+
+# Unit discount approach: Gas and electricity
+# Apply support to eligible consumers
+scenario_12_consumers_unit_discount = (
+    scenario_12_consumers.apply_support_to_eligible_consumers(
+        "electricity",
+        scenario_12_unit_discount_electricity,
+        "unit discount",
+        inplace=False,
+    ).apply_support_to_eligible_consumers(
+        "gas", scenario_12_unit_discount_gas, "unit discount", inplace=False
+    )
+)
+
 
 """
 Printing outputs
@@ -1205,6 +1284,7 @@ scenario_description = {
     "scenario_9": "CORE + Remove 1/2 WHD + GBIS + 1/3 ECO4",
     "scenario_10": "CORE + Remove 1/2 WHD + GBIS + ECO4",
     "scenario_11": "CORE + Remove GBIS + ECO4, original",
+    "scenario_12": "CORE + Remove WHD + GBIS",
 }
 
 # Information about levies
@@ -1222,6 +1302,7 @@ levy_collections = {
     scenario_9_pc: scenario_description.get("scenario_9"),
     scenario_10_pc: scenario_description.get("scenario_10"),
     scenario_11_pc: scenario_description.get("scenario_11"),
+    scenario_12_pc: scenario_description.get("scenario_12"),
 }
 
 
@@ -1277,6 +1358,8 @@ tariffs = {
     scenario_10_electricity_tariff: scenario_description.get("scenario_10"),
     scenario_11_gas_tariff: scenario_description.get("scenario_11"),
     scenario_11_electricity_tariff: scenario_description.get("scenario_11"),
+    scenario_12_gas_tariff: scenario_description.get("scenario_12"),
+    scenario_12_electricity_tariff: scenario_description.get("scenario_12"),
 }
 
 tariffs_info_df = pd.DataFrame()
@@ -1336,6 +1419,9 @@ tariff_pairs = {
     (scenario_11_electricity_tariff, scenario_11_gas_tariff): scenario_description.get(
         "scenario_11"
     ),
+    (scenario_12_electricity_tariff, scenario_12_gas_tariff): scenario_description.get(
+        "scenario_12"
+    ),
 }
 
 cost_ratio_df = pd.DataFrame()
@@ -1370,6 +1456,7 @@ consumer_collections_levy_scenario = {
     scenario_9_consumers_unit_discount: scenario_description.get("scenario_9"),
     scenario_10_consumers_unit_discount: scenario_description.get("scenario_10"),
     scenario_11_consumers_unit_discount: scenario_description.get("scenario_11"),
+    scenario_12_consumers_unit_discount: scenario_description.get("scenario_12"),
 }
 
 consumer_collections_support_type = {
@@ -1386,22 +1473,7 @@ consumer_collections_support_type = {
     scenario_9_consumers_unit_discount: "Unit discount on gas and electricity",
     scenario_10_consumers_unit_discount: "Unit discount on gas and electricity",
     scenario_11_consumers_unit_discount: "Unit discount on gas and electricity",
-}
-
-consumer_collections_support_type = {
-    status_quo_consumers_flat_rebate: "Flat rebate",
-    rebalanced_consumers_flat_rebate: "Flat rebate",
-    scenario_1_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_2_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_3_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_4_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_5_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_6_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_7_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_8_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_9_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_10_consumers_unit_discount: "Unit discount on gas and electricity",
-    scenario_11_consumers_unit_discount: "Unit discount on gas and electricity",
+    scenario_12_consumers_unit_discount: "Unit discount on gas and electricity",
 }
 
 consumer_collections_eligibility = {
@@ -1418,6 +1490,7 @@ consumer_collections_eligibility = {
     scenario_9_consumers_unit_discount: "CWP",
     scenario_10_consumers_unit_discount: "CWP",
     scenario_11_consumers_unit_discount: "CWP",
+    scenario_12_consumers_unit_discount: "CWP",
 }
 
 tidy_consumers_info = pd.DataFrame()
@@ -1444,9 +1517,9 @@ status_quo_row = pd.DataFrame(
         {
             "Levy reform": "Status quo",
             "Targeted group": "WHD",
-            "Public spend (£ per year)": rebalanced_pc.union_levies().general_taxation,
-            "WHD revenue (£ per year)": rebalanced_pc["whd"].revenue,
-            "WHD target spend on support (£ per year)": rebalanced_pc["whd"].revenue
+            "Public spend (£ per year)": pc.union_levies().general_taxation,
+            "WHD revenue (£ per year)": pc["whd"].revenue,
+            "WHD target spend on support (£ per year)": pc["whd"].revenue
             - whd_industry_initiatives,
             "Number of target households": whd_core_target_recipients,
             "WHD target spend on electricity consumption of target households (£)": None,
@@ -1807,6 +1880,36 @@ scenario_11_row = pd.DataFrame(
     ]
 )
 
+scenario_12_row = pd.DataFrame(
+    [
+        {
+            "Levy reform": scenario_description.get("scenario_12"),
+            "Targeted group": "CWP",
+            "Public spend (£ per year)": scenario_12_pc.union_levies().general_taxation,
+            "WHD revenue (£ per year)": scenario_12_pc["whd"].revenue,
+            "WHD target spend on support (£ per year)": scenario_12_pc["whd"].revenue
+            - whd_industry_initiatives,
+            "Number of target households": total_cwp_group,
+            "WHD target spend on electricity consumption of target households (£)": scenario_12_core_target_spending_electricity,
+            "WHD target spend on gas consumption of target households (£)": scenario_12_core_target_spending_gas,
+            "Total electricity consumption of target households (MWh)": cwp_recipients_electricity_consumption,
+            "Total gas consumption of target households (MWh)": cwp_recipients_gas_consumption,
+            "Unit discount electricity (£/MWh)": scenario_12_unit_discount_electricity,
+            "Unit discount gas (£/MWh)": scenario_12_unit_discount_gas,
+            "Percentage discount on unit of electricity (%)": (
+                scenario_12_unit_discount_electricity
+                / scenario_12_electricity_tariff.calculate_variable_consumption(1)
+            )
+            * 100,
+            "Percentage discount on unit of gas (%)": (
+                scenario_12_unit_discount_gas
+                / scenario_12_gas_tariff.calculate_variable_consumption(1)
+            )
+            * 100,
+        }
+    ]
+)
+
 support_info_df = pd.concat(
     [
         status_quo_row,
@@ -1822,6 +1925,7 @@ support_info_df = pd.concat(
         scenario_9_row,
         scenario_10_row,
         scenario_11_row,
+        scenario_12_row,
     ]
 )
 
@@ -1924,6 +2028,8 @@ scenario_label = {
     f"{scenario_description.get('scenario_7')} + Unit discount on gas and electricity + True": "CORE + 1/2 WHD (alt) - Eligible",
     f"{scenario_description.get('scenario_8')} + Unit discount on gas and electricity + False": "CORE + 1/2 WHD + Remove GBIS - Ineligible",
     f"{scenario_description.get('scenario_8')} + Unit discount on gas and electricity + True": "CORE + 1/2 WHD + Remove GBIS - Eligible",
+    f"{scenario_description.get('scenario_12')} + Unit discount on gas and electricity + False": "CORE + Remove WHD + GBIS - Ineligible",
+    f"{scenario_description.get('scenario_12')} + Unit discount on gas and electricity + True": "CORE + Remove WHD + GBIS - Eligible",
     f"{scenario_description.get('scenario_9')} + Unit discount on gas and electricity + False": "CORE + 1/2 WHD + Remove GBIS + 1/3 ECO4 - Ineligible",
     f"{scenario_description.get('scenario_9')} + Unit discount on gas and electricity + True": "CORE + 1/2 WHD + Remove GBIS + 1/3 ECO4 - Eligible",
     f"{scenario_description.get('scenario_11')} + Unit discount on gas and electricity + False": "CORE + Remove GBIS + ECO4 (original) - Ineligible",
