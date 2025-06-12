@@ -17,7 +17,16 @@ If you're also on a unix-like os and you are using conda, run `make install` to 
 - Setup the conda environment
 - Configure `pre-commit`
 
-If you're on Windows or you're using a different environment and dependency manager you'll have to figure it out. This will likely involve cloning the repo, creating an environment and installing the core dependencies.
+### Windows
+If you're on Windows you can get set-up without conda by:
+
+ - Cloning the repo
+ - Creating a virtual environment
+ - Installing the packages in requirements_dev.txt
+ - Installing the packages in requirements.txt
+
+This setup uses only necessary runtime dependencies (no dev tools or doc generators).
+If you want to lint or document, install optional dev tools separately (e.g., `black`, `flake8`, `sphinx`).
 
 ## Setup for Use
 
