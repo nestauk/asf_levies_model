@@ -15,6 +15,11 @@ from typing import List, Optional, Union, Dict
 
 from asf_levies_model import config, PROJECT_DIR
 
+
+"""
+Source data route variables
+"""
+
 # Create Ofgem annex data route variable from config
 if config.get("data_downloads").get("annex"):
     # If a root has been specified, use it.
@@ -48,6 +53,11 @@ if config.get("data_downloads").get("archetypes"):
 else:
     # If no data_output root has been given, just use the base PROJECT_DIR
     ARCHETYPE_DATA_ROOT = str(PROJECT_DIR) + "/"
+
+
+"""
+Price cap period indices
+"""
 
 # Create 28AD Charge restriction period index
 
@@ -166,7 +176,9 @@ _inner_idx = pd.IntervalIndex.from_tuples(
 index_28AD = pd.MultiIndex.from_arrays([_outer_idx, _inner_idx])
 
 
-# Functions for getting and processing Annex 4 data
+"""
+Functions for getting and processing Annex 4 data
+"""
 
 
 def download_annex_4(
@@ -580,7 +592,9 @@ def process_data_FIT(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     return data_tidy_df
 
 
-# Functions for getting and processing Annex 9 data
+"""
+Functions for getting and processing Annex 9 data
+"""
 
 
 def download_annex_9(
@@ -656,19 +670,26 @@ def _get_raw_dataframe_annex9(
         ).reset_index(drop=True)
 
 
-def _slice_tariff_components_tables(
-    sheet_start_row: int,
-    levelisation: bool,
+def _extract_tariff_table(
+    payment_method: str,
+    consumption_type: str,
+    fuel_type: str,
     fileobject: Optional[BytesIO] = None,
 ) -> pd.DataFrame:
     """Extracts tariff components tables of interest from Annex 9 tab "1c Consumption adjusted levels".
 
     Parameters
     ----------
-    sheet_start_row : int
-        Row number of header row in target tables in sheet "1c Consumption adjusted levels".
-    levelisation : bool
-        Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
+    payment_method : str
+        Other Payment Method, Standard Credit or PPM.
+    consumption_type : str
+        Nil consumption or Typical consumption.
+    fuel_type : str
+        Fuel type of interest, valid options are:
+        - "Electricity: Single-Rate Metering Arrangement"
+        - "Electricity: Multi-Register Metering Arrangement"
+        - "Gas"
+        - "Dual fuel (implied)"
     fileobject : BytesIO or None
         BytesIO fileobject if working in memory else None.
 
@@ -679,87 +700,112 @@ def _slice_tariff_components_tables(
     """
 
     # Create dataframe of raw consumption adjusted level costs from spreadsheet tab
-    consumption_adjusted_levels_df = _get_raw_dataframe_annex9(
-        "Consumption adjusted levels", fileobject
-    )
+    df = _get_raw_dataframe_annex9("Consumption adjusted levels", fileobject)
 
-    if levelisation is True:
-        tariff_tables_df = consumption_adjusted_levels_df.iloc[
-            (sheet_start_row - 3) : (sheet_start_row + 10), :
-        ]
-    else:
-        tariff_tables_df = consumption_adjusted_levels_df.iloc[
-            (sheet_start_row - 3) : (sheet_start_row + 9), :
-        ]
+    # Extract row of tables that correspond to payment method of interest
+    payment_method_number = {"Other Payment Method": 1, "Standard Credit": 3, "PPM": 5}
 
-    return tariff_tables_df
+    # Get row index range
+    start_index = df.index[df["Historical level tables"] == payment_method].tolist()[0]
 
-
-def _extract_single_tariff_table(
-    input_df: pd.DataFrame,
-    type_of_consumption: str,
-    table_number: int,
-) -> pd.DataFrame:
-    """Generates a dataframe for a single tariff components table (i.e. only one of Electricity single-rate/Electricity multi-register/Gas/Duel Fuel)
-
-    Parameters
-    ----------
-    input_df : pd.DataFrame
-        Dataframe of tariff components tables of interest (output of _slice_tariff_components function)
-    type_of_consumption : str
-        _"Nil consumption" or "Typical consumption" ONLY.
-    table_number : int
-        1: Electricity single-rate; 2: Electricity multi-register; 3: Gas; 4: Duel fuel
-
-    Returns
-    -------
-    pd.DataFrame
-        Dataframe of single tariff components table of interest.
-    """
-    col_names = (
-        (input_df == type_of_consumption)
-        .sum(axis=0)
-        .astype(bool)
-        .pipe(lambda df: df.index[df])
-    )
-
-    single_tariff_table_df = input_df.loc[
-        :,
-        col_names[table_number - 1] : (
-            input_df.columns[(input_df.columns == col_names[table_number]).argmax() - 1]
-            if table_number < len(col_names)
-            else None
-        ),
+    # Only dual fuel table has Total inc VAT row
+    dual_fuel_header_column = df.columns[
+        df.apply(
+            lambda col: col.astype(str).str.contains("Dual fuel (implied)", regex=False)
+        ).any()
+    ][0]
+    end_index = df.index[df[dual_fuel_header_column] == "Total inc VAT"].tolist()[
+        payment_method_number.get(payment_method)
     ]
 
-    # Drop empty columns
-    single_tariff_table_df = single_tariff_table_df.dropna(axis=1, how="all")
-    # Make first row the header column
-    single_tariff_table_df.columns = single_tariff_table_df.iloc[0].to_list()
-    # Table without first row
-    single_tariff_table_df = single_tariff_table_df.iloc[1:, :]
+    # Isolate payment method tables
+    payment_method_df = df.iloc[start_index : end_index + 1, :]
+
+    # Drop fully empty rows and columns
+    payment_method_df = (
+        payment_method_df.dropna(axis="index", how="all")
+        .dropna(axis="columns", how="all")
+        .reset_index(drop=True)
+    )
+
+    # Forward fill empty column names
+    pd.set_option("future.no_silent_downcasting", True)
+    payment_method_df = payment_method_df.ffill(axis="columns").infer_objects(
+        copy=False
+    )
+
+    # Extract rows that correspond to consumption type (Nil or Typical) and columns that correspond to fuel type
+
+    # Column headers of columns containing data for fuel type of interest
+    fuel_columns = []
+    for column in payment_method_df.columns:
+        if (
+            payment_method_df[column]
+            .str.contains(fuel_type, na=False, regex=False)
+            .any()
+        ):
+            fuel_columns.append(column)
+
+    # Extract columns for fuel of interest
+    fuel_df = payment_method_df[fuel_columns]
+
+    # Extract starting index for Nil and Typical consumption tables
+    start_nil_index = fuel_df.index[
+        fuel_df[fuel_columns[0]] == "Nil consumption"
+    ].tolist()[0]
+    start_typical_index = fuel_df.index[
+        fuel_df[fuel_columns[0]] == "Typical consumption"
+    ].tolist()[0]
+
+    # Nil consumption
+    if consumption_type == "Nil consumption":
+        fuel_nil_df = fuel_df.iloc[
+            start_nil_index : start_typical_index - 1,
+            :,  # assumes a one row gap between Nil Consumption and Typical Consumption tables
+        ].reset_index(drop=True)
+        fuel_nil_df.columns = fuel_nil_df.iloc[0]
+        fuel_nil_df = fuel_nil_df.iloc[1:]
+        fuel_consumption_df = fuel_nil_df
+
+    elif consumption_type == "Typical consumption":
+        consumption_type = "Typical consumption"
+        fuel_typical_df = fuel_df.iloc[start_typical_index:, :].reset_index(drop=True)
+        fuel_typical_df.columns = fuel_typical_df.iloc[0]
+        fuel_typical_df = fuel_typical_df.iloc[1:]
+        fuel_consumption_df = fuel_typical_df
+    else:
+        raise KeyError(
+            "Invalid consumption type. Must be 'Nil consumption' or 'Typical consumption'"
+        )
+
+    # Extract rows that are for individual tariff components only
+    to_exclude = ["Total_GB average"]
+    fuel_consumption_df = fuel_consumption_df[
+        ~fuel_consumption_df[consumption_type].isin(to_exclude)
+        & fuel_consumption_df[consumption_type].notna()
+    ]
+
     # Replace "-" with na
     with warnings.catch_warnings():
         # Suppress Future warning for replace.
         warnings.simplefilter("ignore")
-        single_tariff_table_df = single_tariff_table_df.replace(
-            "[\u002D\u058A\u05BE\u1400\u1806\u2010-\u2015\u2E17\u2E1A\u2E3A\u2E3B\u2E40\u301C\u3030\u30A0\uFE31\uFE32\uFE58\uFE63\uFF0D]",
+        fuel_consumption_df = fuel_consumption_df.replace(
+            "[\u002d\u058a\u05be\u1400\u1806\u2010-\u2015\u2e17\u2e1a\u2e3a\u2e3b\u2e40\u301c\u3030\u30a0\ufe31\ufe32\ufe58\ufe63\uff0d]",
             None,
             regex=True,
         )
-    return single_tariff_table_df
+
+    return fuel_consumption_df
 
 
-def _tidy_tariff_table(
-    input_df: pd.DataFrame, type_of_consumption: str
-) -> pd.DataFrame:
+def _tidy_tariff_table(input_df: pd.DataFrame) -> pd.DataFrame:
     """Generates a dataframe for tariff components for one fuel type-payment method in tidy format.
 
     Parameters
     ----------
     input_df : pd.DataFrame
         Dataframe of tariff components table of interest (output of _extract_single_tariff_table function).
-    type_of_consumption : str
+    consumption_type : str
         "Nil consumption" or "Typical consumption" ONLY.
 
     Returns
@@ -767,10 +813,15 @@ def _tidy_tariff_table(
     pd.DataFrame
         Dataframing containing tariff component values for one fuel type-payment method in tidy format.
     """
+
+    consumption_type = input_df.columns[0]
+
     # Transpose table to put 28ad charging period in the index
-    df = input_df.set_index(type_of_consumption).transpose().reset_index()
+    df = input_df.set_index(consumption_type).transpose().reset_index()
+
     # Get starting period of the table
-    starting_period = pd.to_datetime(df.loc[0, "index"].split("-")[0])
+    starting_period = pd.to_datetime(df.iloc[0, 0].split("-")[0])
+
     # Get index starting point
     try:
         start_index = (
@@ -795,7 +846,7 @@ def _tidy_tariff_table(
     )
 
     tidy_df = (
-        df.drop(columns="index")
+        df.drop(df.columns[0], axis=1)
         .reset_index()
         .melt(
             id_vars=[
@@ -815,198 +866,171 @@ def _tidy_tariff_table(
 
 
 def _process_tariff(
-    sheet_start_row: int,
-    levelisation: bool,
-    type_of_consumption: str,
-    table_number: int,
+    payment_method: str,
+    consumption_type: str,
+    fuel_type: str,
     fileobject: Optional[BytesIO] = None,
 ) -> pd.DataFrame:
     """Generic function for returning processed tariff component data from annex 9.
 
     Parameters
     ----------
-    sheet_start_row : int
-        Row number of header row in target tables in sheet "1c Consumption adjusted levels".
-    levelisation : bool
-        Boolean representing whether "Levelisation" tariff component is included in tariff table of interest.
-    type_of_consumption : str
-        "Nil consumption" or "Typical consumption" ONLY.
-    table_number : int
-        1: Electricity single-rate; 2: Electricity multi-register; 3: Gas; 4: Duel fuel
+
     fileobject : BytesIO or None
         BytesIO fileobject if working in memory else None.
     """
     return _tidy_tariff_table(
-        _extract_single_tariff_table(
-            _slice_tariff_components_tables(sheet_start_row, levelisation, fileobject),
-            type_of_consumption,
-            table_number,
-        ),
-        type_of_consumption,
+        _extract_tariff_table(payment_method, consumption_type, fuel_type, fileobject),
     )
 
 
-## Standard Credit
-# Electricity
-def process_tariff_elec_standard_credit_nil(fileobject: Optional[BytesIO] = None):
+## Payment method: Standard Credit
+# Fuel type: Electricity (single-rate)
+
+
+def process_tariff_elec_standard_credit_nil(
+    fileobject: Optional[BytesIO] = None,
+) -> pd.DataFrame:
     """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
-    sheet_start_row = 55
-    levelisation = False
-    type_of_consumption = "Nil consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "Standard Credit"
+    consumption_type = "Nil consumption"
+    fuel_type = "Electricity: Single-Rate Metering Arrangement"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
 def process_tariff_elec_standard_credit_typical(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms Standard Credit tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
-    sheet_start_row = 70
-    levelisation = False
-    type_of_consumption = "Typical consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "Standard Credit"
+    consumption_type = "Typical consumption"
+    fuel_type = "Electricity: Single-Rate Metering Arrangement"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
-# Gas
+## Payment method: Standard Credit
+# Fuel type: Gas
+
+
 def process_tariff_gas_standard_credit_nil(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Nil consumption."""
-    sheet_start_row = 55
-    levelisation = False
-    type_of_consumption = "Nil consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "Standard Credit"
+    consumption_type = "Nil consumption"
+    fuel_type = "Gas"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
 def process_tariff_gas_standard_credit_typical(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms Standard Credit tariff component data from annex 9 for Gas, Typical consumption."""
-    sheet_start_row = 70
-    levelisation = False
-    type_of_consumption = "Typical consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "Standard Credit"
+    consumption_type = "Typical consumption"
+    fuel_type = "Gas"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
-## Other payment method
-# Electricity
+## Payment method: Other Payment Method
+# Fuel type: Electricity (single-rate)
+
+
 def process_tariff_elec_other_payment_nil(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
-    sheet_start_row = 19
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "Other Payment Method"
+    consumption_type = "Nil consumption"
+    fuel_type = "Electricity: Single-Rate Metering Arrangement"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
 def process_tariff_elec_other_payment_typical(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms Other Payment Method tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
-    sheet_start_row = 35
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "Other Payment Method"
+    consumption_type = "Typical consumption"
+    fuel_type = "Electricity: Single-Rate Metering Arrangement"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
-# Gas
+## Payment method: Other Payment Method
+# Fuel type: Gas
+
+
 def process_tariff_gas_other_payment_nil(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Nil consumption."""
-    sheet_start_row = 19
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "Other Payment Method"
+    consumption_type = "Nil consumption"
+    fuel_type = "Gas"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
 def process_tariff_gas_other_payment_typical(
     fileobject: Optional[BytesIO] = None,
-):
-    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Typical consumption."""
-    sheet_start_row = 35
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+) -> pd.DataFrame:
+    """Extracts and transforms Other Payment Method tariff component data from annex 9 for Gas, Nil consumption."""
+    payment_method = "Other Payment Method"
+    consumption_type = "Typical consumption"
+    fuel_type = "Gas"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
-## PPM
-# Electricity
+## Payment method: PPM
+# Fuel type: Electricity (single-rate)
+
+
 def process_tariff_elec_ppm_nil(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Nil consumption."""
-    sheet_start_row = 88
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "PPM"
+    consumption_type = "Nil consumption"
+    fuel_type = "Electricity: Single-Rate Metering Arrangement"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
 def process_tariff_elec_ppm_typical(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms PPM tariff component data from annex 9 for Electricity: Single-Rate Metering Arrangement, Typical consumption."""
-    sheet_start_row = 104
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 1
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "PPM"
+    consumption_type = "Typical consumption"
+    fuel_type = "Electricity: Single-Rate Metering Arrangement"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
-# Gas
+## Payment method: PPM
+# Fuel type: Gas
+
+
 def process_tariff_gas_ppm_nil(
     fileobject: Optional[BytesIO] = None,
-):
+) -> pd.DataFrame:
     """Extracts and transforms PPM tariff component data from annex 9 for Gas, Nil consumption."""
-    sheet_start_row = 88
-    levelisation = True
-    type_of_consumption = "Nil consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+    payment_method = "PPM"
+    consumption_type = "Nil consumption"
+    fuel_type = "Gas"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
 
 
 def process_tariff_gas_ppm_typical(
     fileobject: Optional[BytesIO] = None,
-):
-    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Typical consumption."""
-    sheet_start_row = 104
-    levelisation = True
-    type_of_consumption = "Typical consumption"
-    table_number = 3
-    return _process_tariff(
-        sheet_start_row, levelisation, type_of_consumption, table_number, fileobject
-    )
+) -> pd.DataFrame:
+    """Extracts and transforms PPM tariff component data from annex 9 for Gas, Nil consumption."""
+    payment_method = "PPM"
+    consumption_type = "Typical consumption"
+    fuel_type = "Gas"
+    return _process_tariff(payment_method, consumption_type, fuel_type, fileobject)
+
+
+"""
+Functions to load Ofgem archetypes data
+"""
 
 
 def _ofgem_archetypes_dataset(descriptor: str) -> pd.DataFrame:
