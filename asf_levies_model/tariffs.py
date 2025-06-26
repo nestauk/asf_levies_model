@@ -23,8 +23,11 @@ class Tariff:
             nc_nil: float, network cost (nil consumption).
             oc_nil: float, operating cost (nil consumption).
             smncc_nil: float, smart metering net cost change (nil consumption).
+            ic_nil: float, industry charges (nil consumption).
             paac_nil: float, payment method additional administrative cost (nil consumption).
             pap_nil: float, payment method adjustment percentage (nil consumption).
+            co_nil: float, core operating costs (nil consumption).
+            drc_nil: float, debt-related costs allowance (nil consumption).
             ebit_nil: float, earnings before interest and tax (EBIT) allowance (nil consumption).
             hap_nil: float, headroom allowance percentage (nil consumption).
             levelisation_nil: float, levelisation (nil consumption).
@@ -35,8 +38,11 @@ class Tariff:
             nc: float, network cost.
             oc: float, operating cost.
             smncc: float, smart metering net cost change.
+            ic: float, industry charges.
             paac: float, payment method additional administrative cost.
             pap: float, payment method adjustment percentage.
+            co: core operating costs.
+            drc: debt-related costs allowance.
             ebit: float, earnings before interest and tax (EBIT) allowance.
             hap: float, headroom allowance percentage.
             levelisation: float, levelisation.
@@ -55,8 +61,11 @@ class Tariff:
         nc_nil: float,
         oc_nil: float,
         smncc_nil: float,
+        ic_nil: float,
         paac_nil: float,
         pap_nil: float,
+        co_nil: float,
+        drc_nil: float,
         ebit_nil: float,
         hap_nil: float,
         levelisation_nil: float,
@@ -67,8 +76,11 @@ class Tariff:
         nc: float,
         oc: float,
         smncc: float,
+        ic: float,
         paac: float,
         pap: float,
+        co: float,
+        drc: float,
         ebit: float,
         hap: float,
         levelisation: float,
@@ -87,8 +99,11 @@ class Tariff:
             nc_nil: float, network cost (nil consumption).
             oc_nil: float, operating cost (nil consumption).
             smncc_nil: float, smart metering net cost change (nil consumption).
+            ic_nil: float, industry charges (nil consumption).
             paac_nil: float, payment method additional administrative cost (nil consumption).
             pap_nil: float, payment method adjustment percentage (nil consumption).
+            co_nil: float, core operating costs (nil consumption).
+            drc_nil: float, debt-related costs allowance (nil consumption).
             ebit_nil: float, earnings before interest and tax (EBIT) allowance (nil consumption).
             hap_nil: float, headroom allowance percentage (nil consumption).
             levelisation_nil: float, levelisation (nil consumption).
@@ -99,8 +114,11 @@ class Tariff:
             nc: float, network cost.
             oc: float, operating cost.
             smncc: float, smart metering net cost change.
+            ic: float, industry charges.
             paac: float, payment method additional administrative cost.
             pap: float, payment method adjustment percentage.
+            co: core operating costs.
+            drc: debt-related costs allowance.
             ebit: float, earnings before interest and tax (EBIT) allowance.
             hap: float, headroom allowance percentage.
             levelisation: float, levelisation.
@@ -116,8 +134,11 @@ class Tariff:
         self.nc_nil = nc_nil
         self.oc_nil = oc_nil
         self.smncc_nil = smncc_nil
+        self.ic_nil = ic_nil
         self.paac_nil = paac_nil
         self.pap_nil = pap_nil
+        self.co_nil = co_nil
+        self.drc_nil = drc_nil
         self.ebit_nil = ebit_nil
         self.hap_nil = hap_nil
         self.levelisation_nil = levelisation_nil
@@ -128,8 +149,11 @@ class Tariff:
         self.nc = nc
         self.oc = oc
         self.smncc = smncc
+        self.ic = ic
         self.paac = paac
         self.pap = pap
+        self.co = co
+        self.drc = drc
         self.ebit = ebit
         self.hap = hap
         self.levelisation = levelisation
@@ -148,8 +172,11 @@ class Tariff:
                     self.nc_nil,
                     self.oc_nil,
                     self.smncc_nil,
+                    self.ic_nil,
                     self.paac_nil,
                     self.pap_nil,
+                    self.co_nil,
+                    self.drc_nil,
                     self.ebit_nil,
                     self.hap_nil,
                     self.levelisation_nil,
@@ -171,8 +198,11 @@ class Tariff:
                     self.nc,
                     self.oc,
                     self.smncc,
+                    self.ic,
                     self.paac,
                     self.pap,
+                    self.co,
+                    self.drc,
                     self.ebit,
                     self.hap,
                     self.levelisation,
@@ -268,8 +298,11 @@ class ElectricityStandardCredit(Tariff):
         nc_nil: float,
         oc_nil: float,
         smncc_nil: float,
+        ic_nil: float,
         paac_nil: float,
         pap_nil: float,
+        co_nil: float,
+        drc_nil: float,
         ebit_nil: float,
         hap_nil: float,
         levelisation_nil: float,
@@ -280,8 +313,11 @@ class ElectricityStandardCredit(Tariff):
         nc: float,
         oc: float,
         smncc: float,
+        ic: float,
         paac: float,
         pap: float,
+        co: float,
+        drc: float,
         ebit: float,
         hap: float,
         levelisation: float,
@@ -298,8 +334,11 @@ class ElectricityStandardCredit(Tariff):
             nc_nil,
             oc_nil,
             smncc_nil,
+            ic_nil,
             paac_nil,
             pap_nil,
+            co_nil,
+            drc_nil,
             ebit_nil,
             hap_nil,
             levelisation_nil,
@@ -310,8 +349,11 @@ class ElectricityStandardCredit(Tariff):
             nc,
             oc,
             smncc,
+            ic,
             paac,
             pap,
+            co,
+            drc,
             ebit,
             hap,
             levelisation,
@@ -411,8 +453,11 @@ class ElectricityStandardCredit(Tariff):
             nc_nil=nil_df["NC"],
             oc_nil=nil_df["OC"],
             smncc_nil=nil_df["SMNCC"],
+            ic_nil=nil_df["IC"],
             paac_nil=nil_df["PAAC"],
             pap_nil=nil_df["PAP"],
+            co_nil=nil_df["CO"],
+            drc_nil=nil_df["DRC"],
             ebit_nil=nil_df["EBIT"],
             hap_nil=nil_df["HAP"],
             levelisation_nil=None,
@@ -422,9 +467,12 @@ class ElectricityStandardCredit(Tariff):
             pc=typical_df["PC"],
             nc=typical_df["NC"],
             oc=typical_df["OC"],
+            ic=typical_df["IC"],
             smncc=typical_df["SMNCC"],
             paac=typical_df["PAAC"],
             pap=typical_df["PAP"],
+            co=typical_df["CO"],
+            drc=typical_df["DRC"],
             ebit=typical_df["EBIT"],
             hap=typical_df["HAP"],
             levelisation=None,
@@ -453,8 +501,11 @@ class GasStandardCredit(Tariff):
         nc_nil: float,
         oc_nil: float,
         smncc_nil: float,
+        ic_nil: float,
         paac_nil: float,
         pap_nil: float,
+        co_nil: float,
+        drc_nil: float,
         ebit_nil: float,
         hap_nil: float,
         levelisation_nil: float,
@@ -465,8 +516,11 @@ class GasStandardCredit(Tariff):
         nc: float,
         oc: float,
         smncc: float,
+        ic: float,
         paac: float,
         pap: float,
+        co: float,
+        drc: float,
         ebit: float,
         hap: float,
         levelisation: float,
@@ -483,8 +537,11 @@ class GasStandardCredit(Tariff):
             nc_nil,
             oc_nil,
             smncc_nil,
+            ic_nil,
             paac_nil,
             pap_nil,
+            co_nil,
+            drc_nil,
             ebit_nil,
             hap_nil,
             levelisation_nil,
@@ -495,8 +552,11 @@ class GasStandardCredit(Tariff):
             nc,
             oc,
             smncc,
+            ic,
             paac,
             pap,
+            co,
+            drc,
             ebit,
             hap,
             levelisation,
@@ -596,8 +656,11 @@ class GasStandardCredit(Tariff):
             nc_nil=nil_df["NC"],
             oc_nil=nil_df["OC"],
             smncc_nil=nil_df["SMNCC"],
+            ic_nil=nil_df["IC"],
             paac_nil=nil_df["PAAC"],
             pap_nil=nil_df["PAP"],
+            co_nil=nil_df["CO"],
+            drc_nil=nil_df["DRC"],
             ebit_nil=nil_df["EBIT"],
             hap_nil=nil_df["HAP"],
             levelisation_nil=None,
@@ -607,9 +670,12 @@ class GasStandardCredit(Tariff):
             pc=typical_df["PC"],
             nc=typical_df["NC"],
             oc=typical_df["OC"],
+            ic=typical_df["IC"],
             smncc=typical_df["SMNCC"],
             paac=typical_df["PAAC"],
             pap=typical_df["PAP"],
+            co=typical_df["CO"],
+            drc=typical_df["DRC"],
             ebit=typical_df["EBIT"],
             hap=typical_df["HAP"],
             levelisation=None,
@@ -638,8 +704,11 @@ class ElectricityOtherPayment(Tariff):
         nc_nil: float,
         oc_nil: float,
         smncc_nil: float,
+        ic_nil: float,
         paac_nil: float,
         pap_nil: float,
+        co_nil: float,
+        drc_nil: float,
         ebit_nil: float,
         hap_nil: float,
         levelisation_nil: float,
@@ -650,8 +719,11 @@ class ElectricityOtherPayment(Tariff):
         nc: float,
         oc: float,
         smncc: float,
+        ic: float,
         paac: float,
         pap: float,
+        co: float,
+        drc: float,
         ebit: float,
         hap: float,
         levelisation: float,
@@ -668,8 +740,11 @@ class ElectricityOtherPayment(Tariff):
             nc_nil,
             oc_nil,
             smncc_nil,
+            ic_nil,
             paac_nil,
             pap_nil,
+            co_nil,
+            drc_nil,
             ebit_nil,
             hap_nil,
             levelisation_nil,
@@ -680,8 +755,11 @@ class ElectricityOtherPayment(Tariff):
             nc,
             oc,
             smncc,
+            ic,
             paac,
             pap,
+            co,
+            drc,
             ebit,
             hap,
             levelisation,
@@ -781,8 +859,11 @@ class ElectricityOtherPayment(Tariff):
             nc_nil=nil_df["NC"],
             oc_nil=nil_df["OC"],
             smncc_nil=nil_df["SMNCC"],
+            ic_nil=nil_df["IC"],
             paac_nil=nil_df["PAAC"],
             pap_nil=nil_df["PAP"],
+            co_nil=nil_df["CO"],
+            drc_nil=nil_df["DRC"],
             ebit_nil=nil_df["EBIT"],
             hap_nil=nil_df["HAP"],
             levelisation_nil=nil_df["Levelisation "],
@@ -792,9 +873,12 @@ class ElectricityOtherPayment(Tariff):
             pc=typical_df["PC"],
             nc=typical_df["NC"],
             oc=typical_df["OC"],
+            ic=typical_df["IC"],
             smncc=typical_df["SMNCC"],
             paac=typical_df["PAAC"],
             pap=typical_df["PAP"],
+            co=typical_df["CO"],
+            drc=typical_df["DRC"],
             ebit=typical_df["EBIT"],
             hap=typical_df["HAP"],
             levelisation=typical_df["Levelisation "],
@@ -823,8 +907,11 @@ class GasOtherPayment(Tariff):
         nc_nil: float,
         oc_nil: float,
         smncc_nil: float,
+        ic_nil: float,
         paac_nil: float,
         pap_nil: float,
+        co_nil: float,
+        drc_nil: float,
         ebit_nil: float,
         hap_nil: float,
         levelisation_nil: float,
@@ -835,8 +922,11 @@ class GasOtherPayment(Tariff):
         nc: float,
         oc: float,
         smncc: float,
+        ic: float,
         paac: float,
         pap: float,
+        co: float,
+        drc: float,
         ebit: float,
         hap: float,
         levelisation: float,
@@ -853,8 +943,11 @@ class GasOtherPayment(Tariff):
             nc_nil,
             oc_nil,
             smncc_nil,
+            ic_nil,
             paac_nil,
             pap_nil,
+            co_nil,
+            drc_nil,
             ebit_nil,
             hap_nil,
             levelisation_nil,
@@ -865,8 +958,11 @@ class GasOtherPayment(Tariff):
             nc,
             oc,
             smncc,
+            ic,
             paac,
             pap,
+            co,
+            drc,
             ebit,
             hap,
             levelisation,
@@ -966,8 +1062,11 @@ class GasOtherPayment(Tariff):
             nc_nil=nil_df["NC"],
             oc_nil=nil_df["OC"],
             smncc_nil=nil_df["SMNCC"],
+            ic_nil=nil_df["IC"],
             paac_nil=nil_df["PAAC"],
             pap_nil=nil_df["PAP"],
+            co_nil=nil_df["CO"],
+            drc_nil=nil_df["DRC"],
             ebit_nil=nil_df["EBIT"],
             hap_nil=nil_df["HAP"],
             levelisation_nil=nil_df["Levelisation "],
@@ -977,9 +1076,12 @@ class GasOtherPayment(Tariff):
             pc=typical_df["PC"],
             nc=typical_df["NC"],
             oc=typical_df["OC"],
+            ic=typical_df["IC"],
             smncc=typical_df["SMNCC"],
             paac=typical_df["PAAC"],
             pap=typical_df["PAP"],
+            co=typical_df["CO"],
+            drc=typical_df["DRC"],
             ebit=typical_df["EBIT"],
             hap=typical_df["HAP"],
             levelisation=typical_df["Levelisation "],
@@ -1008,8 +1110,11 @@ class ElectricityPPM(Tariff):
         nc_nil: float,
         oc_nil: float,
         smncc_nil: float,
+        ic_nil: float,
         paac_nil: float,
         pap_nil: float,
+        co_nil: float,
+        drc_nil: float,
         ebit_nil: float,
         hap_nil: float,
         levelisation_nil: float,
@@ -1020,8 +1125,11 @@ class ElectricityPPM(Tariff):
         nc: float,
         oc: float,
         smncc: float,
+        ic: float,
         paac: float,
         pap: float,
+        co: float,
+        drc: float,
         ebit: float,
         hap: float,
         levelisation: float,
@@ -1038,8 +1146,11 @@ class ElectricityPPM(Tariff):
             nc_nil,
             oc_nil,
             smncc_nil,
+            ic_nil,
             paac_nil,
             pap_nil,
+            co_nil,
+            drc_nil,
             ebit_nil,
             hap_nil,
             levelisation_nil,
@@ -1050,8 +1161,11 @@ class ElectricityPPM(Tariff):
             nc,
             oc,
             smncc,
+            ic,
             paac,
             pap,
+            co,
+            drc,
             ebit,
             hap,
             levelisation,
@@ -1151,8 +1265,11 @@ class ElectricityPPM(Tariff):
             nc_nil=nil_df["NC"],
             oc_nil=nil_df["OC"],
             smncc_nil=nil_df["SMNCC"],
+            ic_nil=nil_df["IC"],
             paac_nil=nil_df["PAAC"],
             pap_nil=nil_df["PAP"],
+            co_nil=nil_df["CO"],
+            drc_nil=nil_df["DRC"],
             ebit_nil=nil_df["EBIT"],
             hap_nil=nil_df["HAP"],
             levelisation_nil=nil_df["Levelisation "],
@@ -1162,9 +1279,12 @@ class ElectricityPPM(Tariff):
             pc=typical_df["PC"],
             nc=typical_df["NC"],
             oc=typical_df["OC"],
+            ic=typical_df["IC"],
             smncc=typical_df["SMNCC"],
             paac=typical_df["PAAC"],
             pap=typical_df["PAP"],
+            co=typical_df["CO"],
+            drc=typical_df["DRC"],
             ebit=typical_df["EBIT"],
             hap=typical_df["HAP"],
             levelisation=typical_df["Levelisation "],
@@ -1193,8 +1313,11 @@ class GasPPM(Tariff):
         nc_nil: float,
         oc_nil: float,
         smncc_nil: float,
+        ic_nil: float,
         paac_nil: float,
         pap_nil: float,
+        co_nil: float,
+        drc_nil: float,
         ebit_nil: float,
         hap_nil: float,
         levelisation_nil: float,
@@ -1205,8 +1328,11 @@ class GasPPM(Tariff):
         nc: float,
         oc: float,
         smncc: float,
+        ic: float,
         paac: float,
         pap: float,
+        co: float,
+        drc: float,
         ebit: float,
         hap: float,
         levelisation: float,
@@ -1223,8 +1349,11 @@ class GasPPM(Tariff):
             nc_nil,
             oc_nil,
             smncc_nil,
+            ic_nil,
             paac_nil,
             pap_nil,
+            co_nil,
+            drc_nil,
             ebit_nil,
             hap_nil,
             levelisation_nil,
@@ -1235,8 +1364,11 @@ class GasPPM(Tariff):
             nc,
             oc,
             smncc,
+            ic,
             paac,
             pap,
+            co,
+            drc,
             ebit,
             hap,
             levelisation,
@@ -1336,8 +1468,11 @@ class GasPPM(Tariff):
             nc_nil=nil_df["NC"],
             oc_nil=nil_df["OC"],
             smncc_nil=nil_df["SMNCC"],
+            ic_nil=nil_df["IC"],
             paac_nil=nil_df["PAAC"],
             pap_nil=nil_df["PAP"],
+            co_nil=nil_df["CO"],
+            drc_nil=nil_df["DRC"],
             ebit_nil=nil_df["EBIT"],
             hap_nil=nil_df["HAP"],
             levelisation_nil=nil_df["Levelisation "],
@@ -1347,9 +1482,12 @@ class GasPPM(Tariff):
             pc=typical_df["PC"],
             nc=typical_df["NC"],
             oc=typical_df["OC"],
+            ic=typical_df["IC"],
             smncc=typical_df["SMNCC"],
             paac=typical_df["PAAC"],
             pap=typical_df["PAP"],
+            co=typical_df["CO"],
+            drc=typical_df["DRC"],
             ebit=typical_df["EBIT"],
             hap=typical_df["HAP"],
             levelisation=typical_df["Levelisation "],
