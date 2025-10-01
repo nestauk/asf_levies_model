@@ -1,6 +1,6 @@
 data_sources:
-  ofgem_annex_4: "https://www.ofgem.gov.uk/sites/default/files/2025-02/Annex-4-Policy-cost-allowance-methodology-v1.20.xlsx"
-  ofgem_annex_9: "https://www.ofgem.gov.uk/sites/default/files/2025-05/Final%20levelised%20cap%20rates%20model%20%28Annex%209%29%201%20July%20to%2030%20September%202025_0.xlsx"
+  ofgem_annex_4: "https://www.ofgem.gov.uk/sites/default/files/2025-08/policy-cost-allowance-methodology-annex-4.xlsx"
+  ofgem_annex_9: "https://www.ofgem.gov.uk/sites/default/files/2025-08/levelisation-allowance-methodology-and-levelised-cap-levels-annex-9.xlsx"
 
 data_downloads:
   annex: "PROJECT_DIR/inputs/data/raw/"
