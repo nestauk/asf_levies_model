@@ -2211,6 +2211,340 @@ ObligatedSupplierVolumeElectricity, fields.
         return rate
 
 
+class NRAB(Levy):
+    """Nuclear Regulated Asset Base Levy, nRAB. \n"""
+
+    __doc__ += (
+        Levy.__doc__.split("\n", maxsplit=4)[4]
+        + """\
+    UpdateDate: datetime, month and year ofgem data was updated.
+        SchemeYear: str, year of interest.
+        OperationalCostsLevy: float, operational Costs Levy rate for charging year.
+        InterimLevyRate_AprJun: float, interim Levy rate, dates are for financial years.
+        InterimLevyRate_JulSep: float, interim Levy rate, dates are for financial years.
+        InterimLevyRate_OctDec: float, interim Levy rate, dates are for financial years.
+        InterimLevyRate_JanMar: float, interim Levy rate, dates are for financial years.
+        DemandWeight1_AprJun: float, demand weight for profile class 1.
+        DemandWeight1_JulSep: float, demand weight for profile class 1.
+        DemandWeight1_OctDec: float, demand weight for profile class 1.
+        DemandWeight1_JanMar: float, demand weight for profile class 1.
+        DemandWeight2_AprJun: float, demand weight for profile class 2.
+        DemandWeight2_JulSep: float, demand weight for profile class 2.
+        DemandWeight2_OctDec: float, demand weight for profile class 2.
+        DemandWeight2_JanMar: float, demand weight for profile class 2.
+        ExpectedPayment_Dec25: float, for costs incurred in December 2025, costs added separately to ensure full cost recovery.
+        ForecastDemand_Dec25: float, to allow recovery of December 2025 operational costs.
+        ForecastDemand_JanMar26: float, to spread the recovery of costs already incurred over 3 months,costs incurred divided over Q1 2026 demand.
+"""
+    )
+
+    @_generate_docstring(
+        Levy.__init__.__doc__,
+        [
+            "    UpdateDate: month and year of ofgem update.",
+            "            SchemeYear: year of interest.",
+            "            OperationalCostsLevy: Operational Costs Levy rate for charging year.",
+            "            InterimLevyRate_AprJun: Interim Levy rate, dates are for financial years.",
+            "            InterimLevyRate_JulSep: Interim Levy rate, dates are for financial years.",
+            "            InterimLevyRate_OctDec: Interim Levy rate, dates are for financial years.",
+            "            InterimLevyRate_JanMar: Interim Levy rate, dates are for financial years.",
+            "            DemandWeight1_AprJun: Demand weight for profile class 1.",
+            "            DemandWeight1_JulSep: Demand weight for profile class 1.",
+            "            DemandWeight1_OctDec: Demand weight for profile class 1.",
+            "            DemandWeight1_JanMar: Demand weight for profile class 1.",
+            "            DemandWeight2_AprJun: Demand weight for profile class 2.",
+            "            DemandWeight2_JulSep: Demand weight for profile class 2.",
+            "            DemandWeight2_OctDec: Demand weight for profile class 2.",
+            "            DemandWeight2_JanMar: Demand weight for profile class 2.",
+            "            ExpectedPayment_Dec25: For costs incurred in December 2025, costs added separately to ensure full cost recovery.",
+            "            ForecastDemand_Dec25: To allow recovery of December 2025 operational costs.",
+            "            ForecastDemand_JanMar26: To spread the recovery of costs already incurred over 3 months,costs incurred divided over Q1 2026 demand.",
+        ],
+    )
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        electricity_weight: float,
+        gas_weight: float,
+        tax_weight: float,
+        electricity_variable_weight: float,
+        electricity_fixed_weight: float,
+        gas_variable_weight: float,
+        gas_fixed_weight: float,
+        electricity_variable_rate: float,
+        electricity_fixed_rate: float,
+        gas_variable_rate: float,
+        gas_fixed_rate: float,
+        general_taxation: float,
+        revenue: float,
+        price_cap_period: Union[pd.Interval, "PriceCapPeriod"],
+        UpdateDate: datetime,
+        SchemeYear: str,
+        OperationalCostsLevy: float,
+        InterimLevyRate_AprJun: float,
+        InterimLevyRate_JulSep: float,
+        InterimLevyRate_OctDec: float,
+        InterimLevyRate_JanMar: float,
+        DemandWeight1_AprJun: float,
+        DemandWeight1_JulSep: float,
+        DemandWeight1_OctDec: float,
+        DemandWeight1_JanMar: float,
+        DemandWeight2_AprJun: float,
+        DemandWeight2_JulSep: float,
+        DemandWeight2_OctDec: float,
+        DemandWeight2_JanMar: float,
+        ExpectedPayment_Dec25: float,
+        ForecastDemand_Dec25: float,
+        ForecastDemand_JanMar26: float,
+    ) -> None:
+        super(NRAB, self).__init__(
+            name,
+            short_name,
+            electricity_weight,
+            gas_weight,
+            tax_weight,
+            electricity_variable_weight,
+            electricity_fixed_weight,
+            gas_variable_weight,
+            gas_fixed_weight,
+            electricity_variable_rate,
+            electricity_fixed_rate,
+            gas_variable_rate,
+            gas_fixed_rate,
+            general_taxation,
+            revenue,
+            price_cap_period,
+        )
+        self.UpdateDate = UpdateDate
+        self.SchemeYear = SchemeYear
+        self.OperationalCostsLevy = (OperationalCostsLevy,)
+        self.InterimLevyRate_AprJun = (InterimLevyRate_AprJun,)
+        self.InterimLevyRate_JulSep = (InterimLevyRate_JulSep,)
+        self.InterimLevyRate_OctDec = (InterimLevyRate_OctDec,)
+        self.InterimLevyRate_JanMar = (InterimLevyRate_JanMar,)
+        self.DemandWeight1_AprJun = (DemandWeight1_AprJun,)
+        self.DemandWeight1_JulSep = (DemandWeight1_JulSep,)
+        self.DemandWeight1_OctDec = (DemandWeight1_OctDec,)
+        self.DemandWeight1_JanMar = (DemandWeight1_JanMar,)
+        self.DemandWeight2_AprJun = (DemandWeight2_AprJun,)
+        self.DemandWeight2_JulSep = (DemandWeight2_JulSep,)
+        self.DemandWeight2_OctDec = (DemandWeight2_OctDec,)
+        self.DemandWeight2_JanMar = (DemandWeight2_JanMar,)
+        self.ExpectedPayment_Dec25 = (ExpectedPayment_Dec25,)
+        self.ForecastDemand_Dec25 = (ForecastDemand_Dec25,)
+        self.ForecastDemand_JanMar26 = ForecastDemand_JanMar26
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        df: pd.DataFrame,
+        revenue: float = None,
+        denominator: float = None,
+        metering_arrangement=None,
+        price_cap: str = "LATEST",
+    ) -> "GBIS":
+        """Create nRAB levy instance from dataframe input.
+
+        Uses the `process_data_NRAB()` output from `asf_levies_model.getters.load_data` to \
+initialise an NRAB levy object at present values.
+
+        As NRAB doesn't have a stated revenue or scheme cost, revenue must either be provided,\
+or a denominator in MWh given to calculate it from the levy value.
+
+        NRAB has a different levy rate according to 'single rate' or 'multi-register' metering. \
+As such, the metering arrangement must be selected.
+
+        Owing to delays in commencing the levy, the first levy rate (Jan-Mar 2026) is calculated \
+differently from subsequent levies so that costs from the scheme commencement (Dec 2025) can be \
+recovered.
+
+        price_cap can be specified to use values for a specific price cap. The default is latest. \
+To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
+price cap period of interest.
+
+        Args:
+            df: a dataframe with UpdateDate, SchemeYear, \
+OperationalCostsLevy, InterimLevyRate_AprJun, \
+InterimLevyRate_JulSep, InterimLevyRate_OctDec, InterimLevyRate_JanMar, \
+DemandWeight1_AprJun, DemandWeight1_JulSep, DemandWeight1_OctDec, \
+DemandWeight1_JanMar, DemandWeight2_AprJun, DemandWeight2_JulSep, \
+DemandWeight2_OctDec, DemandWeight2_JanMart, ExpectedPayment_Dec25, \
+ForecastDemand_Dec25, ForecastDemand_JanMar26, fields.
+            revenue: float, a total revenue amount (£) for the levy.
+            metering_arrangement: str, either 'single-rate' or 'multi-register'.
+            price_cap: str, price cap period to use; default: LATEST.
+        """
+        if not metering_arrangement:
+            raise ValueError(
+                "Metering arrangement must be given as either 'single-rate' or 'multi-register'."
+            )
+        if metering_arrangement not in ["single-rate" or "multi-register"]:
+            raise ValueError(
+                "Metering arrangement must be given as either 'single-rate' or 'multi-register'."
+            )
+
+        # get latest NRAB values from df
+        if price_cap == "LATEST":
+            # Get first index where data is not captured
+            latest_index = (
+                df["Operational Costs Levy rate for charging year"]
+                .notna()
+                .to_numpy()
+                .nonzero()[0]
+                .max()
+            )
+
+            df = df.iloc[latest_index]
+        else:
+            # Otherwise assume you've got a provided date
+            price_cap_date = pd.to_datetime(price_cap)
+            mask = df.index.map(
+                lambda row: True if price_cap_date in row[1] else False
+            ).to_numpy()
+            if mask.sum() == 0:
+                raise IndexError(f"Price cap data {price_cap} not found in index.")
+            elif mask.sum() > 1:
+                # Use most recent matching period
+                df = df.loc[mask].iloc[-1]
+                warnings.warn(
+                    f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
+                )
+            else:
+                df = df.loc[mask].iloc[0]
+
+        price_cap_period = PriceCapPeriod(
+            left=df.name[1].left, right=df.name[1].right, closed="both"
+        )
+
+        # First price cap period uses a different calculation.
+        if price_cap_period == PriceCapPeriod(
+            pd.to_datetime("2026-01-01 00:00:00"),
+            pd.to_datetime("2026-03-31 23:59:59"),
+            "both",
+        ):
+            nrab_levy = df["Interim Levy Rate: Jan to Mar of financial year"] + (
+                df["Expected payment (December 2025)"]
+                / df["Forecast demand for January 2026 to March 2026"]
+            )
+            # operational levy adjustment
+            operational_levy = df["Operational Costs Levy rate for charging year"] + (
+                (
+                    df["Operational Costs Levy rate for charging year"]
+                    * df["Forecast demand for December 2025"]
+                )
+                / df["Forecast demand for January 2026 to March 2026"]
+            )
+            # Combine levy rate and operational costs
+            nrab_levy = nrab_levy + operational_levy
+        else:
+            nrab_levy = (
+                cls.calculate_nrab_levy(
+                    df["Interim Levy Rate: Apr to Jun of financial year"],
+                    df["Interim Levy Rate: Jul to Sep of financial year"],
+                    df["Interim Levy Rate: Oct to Dec of financial year"],
+                    df["Interim Levy Rate: Jan to Mar of financial year"],
+                    df["Demand weight, profile class 1: Apr to Jun"],
+                    df["Demand weight, profile class 1: Jul to Sep"],
+                    df["Demand weight, profile class 1: Oct to Dec"],
+                    df["Demand weight, profile class 1: Jan to Mar"],
+                    df["Demand weight, profile class 2: Apr to Jun"],
+                    df["Demand weight, profile class 2: Jul to Sep"],
+                    df["Demand weight, profile class 2: Oct to Dec"],
+                    df["Demand weight, profile class 2: Jan to Mar"],
+                    metering_arrangement,
+                )
+                + df["Operational Costs Levy rate for charging year"]
+            )
+
+        # TODO: Add losses adjustment here.
+
+        if not revenue:
+            revenue = nrab_levy * denominator
+
+        return cls(
+            name=f"Nuclear Regulated Asset Base (nRAB), {metering_arrangement} metering",
+            short_name="nrab",
+            electricity_weight=1,
+            gas_weight=0,
+            tax_weight=0,
+            electricity_variable_weight=1,
+            electricity_fixed_weight=0,
+            gas_variable_weight=0,
+            gas_fixed_weight=0,
+            electricity_variable_rate=nrab_levy,
+            electricity_fixed_rate=0,
+            gas_variable_rate=0,
+            gas_fixed_rate=0,
+            general_taxation=0,
+            revenue=revenue,
+            price_cap_period=price_cap_period,
+            UpdateDate=df.UpdateDate,
+            SchemeYear=df.SchemeYear,
+            OperationalCostsLevy=df["Operational Costs Levy rate for charging year"],
+            InterimLevyRate_AprJun=df[
+                "Interim Levy Rate: Apr to Jun of financial year"
+            ],
+            InterimLevyRate_JulSep=df[
+                "Interim Levy Rate: Jul to Sep of financial year"
+            ],
+            InterimLevyRate_OctDec=df[
+                "Interim Levy Rate: Oct to Dec of financial year"
+            ],
+            InterimLevyRate_JanMar=df[
+                "Interim Levy Rate: Jan to Mar of financial year"
+            ],
+            DemandWeight1_AprJun=df["Demand weight, profile class 1: Apr to Jun"],
+            DemandWeight1_JulSep=df["Demand weight, profile class 1: Jul to Sep"],
+            DemandWeight1_OctDec=df["Demand weight, profile class 1: Oct to Dec"],
+            DemandWeight1_JanMar=df["Demand weight, profile class 1: Jan to Mar"],
+            DemandWeight2_AprJun=df["Demand weight, profile class 2: Apr to Jun"],
+            DemandWeight2_JulSep=df["Demand weight, profile class 2: Jul to Sep"],
+            DemandWeight2_OctDec=df["Demand weight, profile class 2: Oct to Dec"],
+            DemandWeight2_JanMar=df["Demand weight, profile class 2: Jan to Mar"],
+            ExpectedPayment_Dec25=df["Expected payment (December 2025)"],
+            ForecastDemand_Dec25=df["Forecast demand for December 2025"],
+            ForecastDemand_JanMar26=df[
+                "Forecast demand for January 2026 to March 2026"
+            ],
+        )
+
+    @staticmethod
+    def calculate_nrab_levy(
+        InterimLevyRate_AprJun: float,
+        InterimLevyRate_JulSep: float,
+        InterimLevyRate_OctDec: float,
+        InterimLevyRate_JanMar: float,
+        DemandWeight1_AprJun: float,
+        DemandWeight1_JulSep: float,
+        DemandWeight1_OctDec: float,
+        DemandWeight1_JanMar: float,
+        DemandWeight2_AprJun: float,
+        DemandWeight2_JulSep: float,
+        DemandWeight2_OctDec: float,
+        DemandWeight2_JanMar: float,
+        metering_arrangement: str,
+    ):
+        """Calculate nRAB levy rate from given values."""
+        if metering_arrangement == "single-rate":
+            rate = (
+                (InterimLevyRate_AprJun * DemandWeight1_AprJun)
+                + (InterimLevyRate_JulSep * DemandWeight1_JulSep)
+                + (InterimLevyRate_OctDec * DemandWeight1_OctDec)
+                + (InterimLevyRate_JanMar * DemandWeight1_JanMar)
+            )
+        elif metering_arrangement == "multi-register":
+            rate = (
+                (InterimLevyRate_AprJun * DemandWeight2_AprJun)
+                + (InterimLevyRate_JulSep * DemandWeight2_JulSep)
+                + (InterimLevyRate_OctDec * DemandWeight2_OctDec)
+                + (InterimLevyRate_JanMar * DemandWeight2_JanMar)
+            )
+        else:
+            raise ValueError("Insufficient information to calculate nRAB rate.")
+        return rate
+
+
 class LevyCollection:
     """A container for Levy objects.
 
