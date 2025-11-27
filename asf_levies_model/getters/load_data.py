@@ -321,6 +321,7 @@ def _get_charging_years(policy_df: pd.DataFrame, policy_acronym: str) -> list:
         "ggl": "GGL scheme year:",
         "ncc": "NCC scheme year:",
         "nrab": "Cfd year:",
+        "losses": "AAHEDC charging year:",
     }.get(policy_acronym.lower())
     if not policy_string:
         raise ValueError("Acronym given does not match a valid policy.")
@@ -504,6 +505,66 @@ def process_data_NRAB(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         "Forecast demand for January 2026 to March 2026",
     ]
     return _process_data("nRAB", parameters, names, fileobject)
+
+
+def process_data_losses(
+    fileobject: Optional[BytesIO] = None,
+    policy_acronym: str = None,
+    metering_arrangement: str = None,
+) -> pd.DataFrame:
+    """Extracts and transforms data from corresponding Losses tab in annex 4.
+    Valid policy acronyms are: AAHEDC, NCC, NRAB.
+    Valid metering arrangements are: single-rate, multi-register.
+    """
+    if not policy_acronym:
+        raise ValueError("Policy Acronym required from: aahedc, ncc, nrab.")
+    elif policy_acronym not in ["aahedc", "ncc", "nrab"]:
+        raise ValueError(
+            f"Policy Acronym {policy_acronym} not recognised, please specify from: aahedc, ncc, nrab."
+        )
+
+    if not metering_arrangement:
+        raise ValueError(
+            "Metering arrangement required from: single-rate, multi-register."
+        )
+    elif metering_arrangement not in ["single-rate", "multi-register"]:
+        raise ValueError(
+            f"Metering arrangement {metering_arrangement} not recognised, please specify from: single-rate, multi-register."
+        )
+
+    params = [
+        "Eastern",
+        "East Midlands",
+        "London",
+        "N Wales and Mersey",
+        "Midlands",
+        "Northern",
+        "North West",
+        "Southern",
+        "South East",
+        "South Wales",
+        "Southern Western",
+        "Yorkshire",
+        "Southern Scotland",
+        "Northern Scotland",
+    ]
+
+    # Gets full table of losses data
+    losses_df = _process_data("Losses", params, params * 4, fileobject)
+    # Return relevant parts of the table
+    if (policy_acronym == "aahedc") & (metering_arrangement == "single-rate"):
+        losses_df = losses_df.iloc[:, range(2, 16)]
+    elif (policy_acronym == "aahedc") & (metering_arrangement == "multi-register"):
+        losses_df = losses_df.iloc[:, range(16, 30)]
+    elif (policy_acronym in ["ncc", "nrab"]) & (metering_arrangement == "single-rate"):
+        losses_df = losses_df.iloc[:, range(30, 44)]
+    elif (policy_acronym in ["ncc", "nrab"]) & (
+        metering_arrangement == "multi-register"
+    ):
+        losses_df = losses_df.iloc[:, range(44, 58)]
+    else:
+        raise ValueError("Error retrieving Losses data.")
+    return losses_df
 
 
 def process_data_ECO(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
