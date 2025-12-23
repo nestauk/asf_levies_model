@@ -2372,7 +2372,7 @@ class NRAB(Levy):
         metering_arrangement: str = None,
         losses_df: pd.DataFrame = None,
         price_cap: str = "LATEST",
-    ) -> "GBIS":
+    ) -> "NRAB":
         """Create nRAB levy instance from dataframe input.
 
         Uses the `process_data_NRAB()` output from `asf_levies_model.getters.load_data` to \
@@ -2434,6 +2434,13 @@ ForecastDemand_Dec25, ForecastDemand_JanMar26, fields.
         else:
             # Otherwise assume you've got a provided date
             price_cap_date = pd.to_datetime(price_cap)
+
+            # Alert message if price cap period pre-dates nrab
+            if price_cap_date < pd.to_datetime("2026-01-01"):
+                print(
+                    f"Selected date {price_cap} pre-dates introduction of nRAB levy. Levy object will not contain any levy rates."
+                )
+
             mask = df.index.map(
                 lambda row: True if price_cap_date in row[1] else False
             ).to_numpy()
