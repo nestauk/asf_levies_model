@@ -666,6 +666,7 @@ class AAHEDC(Levy):
         df: pd.DataFrame,
         revenue: float = None,
         denominator: float = None,
+        losses_df: pd.DataFrame = None,
         price_cap: str = "LATEST",
     ) -> "AAHEDC":
         """Create AAHEDC levy instance from dataframe input.
@@ -676,6 +677,8 @@ initialise an AAHEDC levy object at present values.
         As AAHEDC doesn't have a stated revenue or scheme cost, revenue must either be provided,\
 or a denominator in MWh given to calculate it from the levy value (£/MWh at GSP).
 
+        AAHEDC is uprated for losses, provide the relevant losses_df to account for GB averaged losses.
+
         price_cap can be specified to use values for a specific price cap. The default is latest. \
 To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
 price cap period of interest.
@@ -685,6 +688,7 @@ price cap period of interest.
 TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
             revenue: float, a total revenue amount (£) for the levy.
             denominator: float, a total supply amount (MWh) to calculate the revenue.
+            losses_df: a dataframe of distribution losses.
             price_cap: str, price cap period to use; default: LATEST.
 
         Raises:
@@ -703,6 +707,8 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
                 .nonzero()[0][0]
             )
             df = df.iloc[latest_index - 1]
+            if losses_df is not None:
+                losses_df = losses_df.iloc[latest_index - 1]
         else:
             # Otherwise assume you've got a provided date
             price_cap_date = pd.to_datetime(price_cap)
@@ -717,8 +723,12 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
                 warnings.warn(
                     f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
                 )
+                if losses_df is not None:
+                    losses_df = losses_df.loc[mask].iloc[-1]
             else:
                 df = df.loc[mask].iloc[0]
+                if losses_df is not None:
+                    losses_df = losses_df.loc[mask].iloc[0]
 
         aahedc_tariff_forecast = cls.calculate_aahedc_tariff_forecast(
             df.TariffPreviousYear, df.ForecastAnnualRPIPreviousYear
@@ -727,6 +737,9 @@ TariffPreviousYear, ForecastAnnualRPIPreviousYear fields.
         aahedc_levy = cls.calculate_aahedc_rate(
             df.TariffCurrentYear, aahedc_tariff_forecast
         )
+
+        if losses_df is not None:
+            aahedc_levy = (losses_df * aahedc_levy).mean()
 
         price_cap_period = PriceCapPeriod(
             left=df.name[1].left, right=df.name[1].right, closed="both"
@@ -1024,6 +1037,7 @@ class NCC(Levy):
         df: pd.DataFrame,
         revenue: float = None,
         scaling_factor: float = 1.0,
+        losses_df: pd.DataFrame = None,
         price_cap: str = "LATEST",
     ) -> "NCC":
         """Create NCC levy instance from dataframe input.
@@ -1034,6 +1048,9 @@ initialise an NCC levy object at present values.
         As NCC has a stated levy fund amount, this is used by default as the revenue, however a revenue \
 value can also be provided if a different value is required.
 
+        NCC is uprated to account for transmission and distribution losses, to add the GB average losses \
+include the relevant losses table.
+
         price_cap can be specified to use values for a specific price cap. The default is latest. \
 To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
 price cap period of interest.
@@ -1042,6 +1059,7 @@ price cap period of interest.
             df: a dataframe with UpdateDate, SchemeYear, LevyRate, BackdatedLevyRate fields.
             revenue: float, a total revenue amount (£) for the levy.
             scaling_factor: float, factor to scale total revenue amount (£) to reflect e.g. only domestic share.
+            losses_df: a dataframe of relevant losses.
             price_cap: str, price cap period to use; default: LATEST.
 
         Raises:
@@ -1052,6 +1070,8 @@ price cap period of interest.
             latest_index = df["EstimatedLevyFund"].notna().to_numpy().nonzero()[0].max()
 
             df = df.iloc[latest_index]
+            if losses_df is not None:
+                losses_df = losses_df.iloc[latest_index]
         else:
             # Otherwise assume you've got a provided date
             price_cap_date = pd.to_datetime(price_cap)
@@ -1066,12 +1086,20 @@ price cap period of interest.
                 warnings.warn(
                     f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
                 )
+                if losses_df is not None:
+                    losses_df = losses_df.loc[mask].iloc[-1]
             else:
                 df = df.loc[mask].iloc[0]
+                if losses_df is not None:
+                    losses_df = losses_df.loc[mask].iloc[0]
 
         ncc_levy = cls.calculate_ncc_rate(
             df.EstimatedLevyFund, df.AdminCosts, df.ReserveFund, df.EligibleDemand
         )
+
+        # Calculate transmission and distribution losses.
+        if losses_df is not None:
+            ncc_levy = (losses_df * ncc_levy).mean()
 
         price_cap_period = PriceCapPeriod(
             left=df.name[1].left, right=df.name[1].right, closed="both"
@@ -2342,6 +2370,7 @@ class NRAB(Levy):
         revenue: float = None,
         denominator: float = None,
         metering_arrangement: str = None,
+        losses_df: pd.DataFrame = None,
         price_cap: str = "LATEST",
     ) -> "NRAB":
         """Create nRAB levy instance from dataframe input.
@@ -2359,6 +2388,9 @@ As such, the metering arrangement must be selected.
 differently from subsequent levies so that costs from the scheme commencement (Dec 2025) can be \
 recovered.
 
+        Transmission and distribution losses can be accounted for as a GB average by providing the \
+relevant losses dataframe.
+
         price_cap can be specified to use values for a specific price cap. The default is latest. \
 To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
 price cap period of interest.
@@ -2373,6 +2405,7 @@ DemandWeight2_OctDec, DemandWeight2_JanMart, ExpectedPayment_Dec25, \
 ForecastDemand_Dec25, ForecastDemand_JanMar26, fields.
             revenue: float, a total revenue amount (£) for the levy.
             metering_arrangement: str, either 'single-rate' or 'multi-register'.
+            losses_df: the relevant losses dataframe for the policy cost and metering arrangement.
             price_cap: str, price cap period to use; default: LATEST.
         """
         if not metering_arrangement:
@@ -2396,6 +2429,8 @@ ForecastDemand_Dec25, ForecastDemand_JanMar26, fields.
             )
 
             df = df.iloc[latest_index]
+            if losses_df is not None:
+                losses_df = losses_df.iloc[latest_index]
         else:
             # Otherwise assume you've got a provided date
             price_cap_date = pd.to_datetime(price_cap)
@@ -2417,8 +2452,12 @@ ForecastDemand_Dec25, ForecastDemand_JanMar26, fields.
                 warnings.warn(
                     f"Multiple price cap periods returned, using price cap period {df.name[1].left.strftime('%Y-%m-%d')} to {df.name[1].right.strftime('%Y-%m-%d')}"
                 )
+                if losses_df is not None:
+                    losses_df = losses_df.loc[mask].iloc[-1]
             else:
                 df = df.loc[mask].iloc[0]
+                if losses_df is not None:
+                    losses_df = losses_df.loc[mask].iloc[0]
 
         price_cap_period = PriceCapPeriod(
             left=df.name[1].left, right=df.name[1].right, closed="both"
@@ -2464,8 +2503,11 @@ ForecastDemand_Dec25, ForecastDemand_JanMar26, fields.
                 + df["Operational Costs Levy rate for charging year"]
             )
 
-        # TODO: Add losses adjustment here.
+        # transmission and distribution losses adjustment.
+        if losses_df is not None:
+            nrab_levy = (losses_df * nrab_levy).mean()
 
+        # Revenue calculation
         if not revenue:
             revenue = nrab_levy * denominator
 
