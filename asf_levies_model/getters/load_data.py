@@ -277,7 +277,7 @@ def _get_raw_dataframe_annex4(
             header=1,
             index_col=0,
             engine="calamine",
-        ).reset_index(drop=True)
+        ).reset_index(drop=True if sheet != "3l nRAB" else False)
     else:
         try:
             sheet = [
@@ -294,14 +294,17 @@ def _get_raw_dataframe_annex4(
             header=1,
             index_col=0,
             engine="calamine",
-        ).reset_index(drop=True)
+        ).reset_index(drop=True if sheet != "3l nRAB" else False)
 
 
 def _get_update_dates(policy_df: pd.DataFrame) -> list:
     """Populates a list containing the month-year dates when data was updated."""
     return (
         policy_df.loc[
-            (policy_df == "Updated calculated as of:").sum(axis=1).idxmax(), :
+            policy_df.isin(["Updated calculated as of:", "Update calculated as of:"])
+            .sum(axis=1)
+            .idxmax(),
+            :,
         ]
         .dropna()
         .to_list()[1:]
@@ -317,6 +320,7 @@ def _get_charging_years(policy_df: pd.DataFrame, policy_acronym: str) -> list:
         "aahedc": "AAHEDC charging year:",
         "ggl": "GGL scheme year:",
         "ncc": "NCC scheme year:",
+        "nrab": "Cfd year:",
     }.get(policy_acronym.lower())
     if not policy_string:
         raise ValueError("Acronym given does not match a valid policy.")
@@ -459,6 +463,47 @@ def process_data_NCC(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     ]
     names = ["EstimatedLevyFund", "AdminCosts", "ReserveFund", "EligibleDemand"]
     return _process_data("NCC", parameters, names, fileobject)
+
+
+def process_data_NRAB(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
+    """Extracts and transforms data from corresponding nRAB tab in annex 4 into tidy format."""
+    parameters = [
+        "Operational Costs Levy rate for charging year",
+        "Apr to Jun of financial year",
+        "Jul to Sep of financial year",
+        "Oct to Dec of financial year",
+        "Jan to Mar of financial year",
+        "Apr to Jun",
+        "Jul to Sep",
+        "Oct to Dec",
+        "Jan to Mar",
+        "Apr to Jun",
+        "Jul to Sep",
+        "Oct to Dec",
+        "Jan to Mar",
+        "Expected payment (December 2025)",
+        "Forecast demand for December 2025",
+        "Forecast demand for January 2026 to March 2026",
+    ]
+    names = [
+        "Operational Costs Levy rate for charging year",
+        "Interim Levy Rate: Apr to Jun of financial year",
+        "Interim Levy Rate: Jul to Sep of financial year",
+        "Interim Levy Rate: Oct to Dec of financial year",
+        "Interim Levy Rate: Jan to Mar of financial year",
+        "Demand weight, profile class 1: Apr to Jun",
+        "Demand weight, profile class 1: Jul to Sep",
+        "Demand weight, profile class 1: Oct to Dec",
+        "Demand weight, profile class 1: Jan to Mar",
+        "Demand weight, profile class 2: Apr to Jun",
+        "Demand weight, profile class 2: Jul to Sep",
+        "Demand weight, profile class 2: Oct to Dec",
+        "Demand weight, profile class 2: Jan to Mar",
+        "Expected payment (December 2025)",
+        "Forecast demand for December 2025",
+        "Forecast demand for January 2026 to March 2026",
+    ]
+    return _process_data("nRAB", parameters, names, fileobject)
 
 
 def process_data_ECO(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
