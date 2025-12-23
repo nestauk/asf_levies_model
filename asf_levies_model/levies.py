@@ -677,7 +677,7 @@ initialise an AAHEDC levy object at present values.
         As AAHEDC doesn't have a stated revenue or scheme cost, revenue must either be provided,\
 or a denominator in MWh given to calculate it from the levy value (£/MWh at GSP).
 
-        AAHEDC is uprated for losses, provide the relevant losses_df to account fo GB averaged losses.
+        AAHEDC is uprated for losses, provide the relevant losses_df to account for GB averaged losses.
 
         price_cap can be specified to use values for a specific price cap. The default is latest. \
 To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
