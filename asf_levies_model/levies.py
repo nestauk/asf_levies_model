@@ -1162,6 +1162,8 @@ class WHD(Levy):
         NoncoreSpending: float, spending on industry initiatives and broader group rebates (£).
         ObligatedSuppliersCustomerBase: int, number of customers of obligated suppliers (count).
         CompulsorySupplierFractionOfCoreGroup: float, compulsory suppliers percentage of core group (%).
+        SupplyVolumeGas: float, MWh supplied for calculating unit rate cost recovery.
+        SupplyVolumeElectricity: float, MWh supplied for calculating unit rate cost recovery.
 """
     )
 
@@ -1175,6 +1177,8 @@ class WHD(Levy):
             "            NoncoreSpending: spending on industry initiatives and broader group rebates.",
             "            ObligatedSuppliersCustomerBase: number of customers of obligated suppliers.",
             "            CompulsorySupplierFractionOfCoreGroup: compulsory suppliers percentage of core group.",
+            "            SupplyVolumeGas: MWh supplied for calculating unit rate cost recovery.",
+            "            SupplyVolumeElectricity: MWh supplied for calculating unit rate cost recovery.",
         ],
     )
     def __init__(
@@ -1202,6 +1206,8 @@ class WHD(Levy):
         NoncoreSpending: float,
         ObligatedSuppliersCustomerBase: int,
         CompulsorySupplierFractionOfCoreGroup: float,
+        SupplyVolumeGas: float,
+        SupplyVolumeElectricity: float,
     ) -> None:
         super(WHD, self).__init__(
             name,
@@ -1230,6 +1236,8 @@ class WHD(Levy):
         self.CompulsorySupplierFractionOfCoreGroup = (
             CompulsorySupplierFractionOfCoreGroup
         )
+        self.SupplyVolumeGas = SupplyVolumeGas
+        self.SupplyVolumeElectricity = SupplyVolumeElectricity
 
     @classmethod
     def from_dataframe(
@@ -1248,9 +1256,15 @@ initialise a WHD levy object at present values.
         As WHD has a stated scheme cost, this is used by default as the revenue, however a revenue \
 value can also be provided if a different value is required.
 
-        WHD is balanced between gas and electricity customers to produce a single rate, however \
+        The cost recovery of WHD changed in April 2026 from a standing charge to a unit rate. The specific \
+levy calculated will depend on whether the price cap period of interest is April 2026 or greater.
+
+        Standing charge WHD is balanced between gas and electricity customers to produce a single rate, however \
 the ofgem spreadsheet doesn't provide sufficient information to calculate the effective gas and electric \
 shares. If customers_gas and customers_elec are provided the levy gets share information for the status quo levy.
+
+        Unit rate WHD is split 50:50 between gas and electricity, in this case the customers_gas and customers_elec \
+arguments are ignored.
 
         price_cap can be specified to use values for a specific price cap. The default is latest. \
 To specify a specific price cap period supply a date in the form `YYYY-MM-DD` that falls within the \
@@ -1289,14 +1303,6 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
             else:
                 df = df.loc[mask].iloc[0]
 
-        whd_levy = cls.calculate_whd_rate(
-            df.TargetSpendingForSchemeYear,
-            df.CoreSpending,
-            df.NoncoreSpending,
-            df.ObligatedSuppliersCustomerBase,
-            df.CompulsorySupplierFractionOfCoreGroup,
-        )
-
         price_cap_period = PriceCapPeriod(
             left=df.name[1].left, right=df.name[1].right, closed="both"
         )
@@ -1304,27 +1310,89 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
         if not revenue:
             revenue = df.TargetSpendingForSchemeYear
 
-        if customers_gas and customers_elec:
-            gas_weight = customers_gas / (customers_gas + customers_elec)
-            elec_weight = 1 - gas_weight
-        else:
-            gas_weight = np.nan
-            elec_weight = np.nan
+        if price_cap_period.left < datetime(2026, 4, 1):
+            # If price cap is before April 2026, WHD is a standing charge
+            whd_levy = cls.calculate_whd_rate_standing(
+                df.TargetSpendingForSchemeYear,
+                df.CoreSpending,
+                df.NoncoreSpending,
+                df.ObligatedSuppliersCustomerBase,
+                df.CompulsorySupplierFractionOfCoreGroup,
+            )
+            electricity_variable_rate = 0
+            electricity_fixed_rate = whd_levy
+            gas_variable_rate = 0
+            gas_fixed_rate = whd_levy
 
+            if customers_gas and customers_elec:
+                gas_weight = customers_gas / (customers_gas + customers_elec)
+                elec_weight = 1 - gas_weight
+            else:
+                gas_weight = np.nan
+                elec_weight = np.nan
+            electricity_variable_weight = 0
+            electricity_fixed_weight = 1
+            gas_variable_weight = 0
+            gas_fixed_weight = 1
+            SupplyVolumeGas = None
+            SupplyVolumeElectricity = None
+        elif price_cap_period.left < datetime(2027, 4, 1):
+            # If price cap is in the period April 2026 - April 2027
+            # There is some additional cost recovery required on the standing charge
+            # This is £3.41 per fuel
+            # We assume this is fixed and doesn't impact the variable rate allocations.
+            electricity_fixed_rate = 3.41
+            gas_fixed_rate = 3.41
+
+            gas_variable_rate, electricity_variable_rate = (
+                cls.calculate_whd_rate_variable(
+                    df.TargetSpendingForSchemeYear,
+                    df.SupplyVolumeGas,
+                    df.SupplyVolumeElectricity,
+                )
+            )
+            gas_weight = 0.5
+            elec_weight = 0.5
+            electricity_variable_weight = 1
+            electricity_fixed_weight = 0
+            gas_variable_weight = 1
+            gas_fixed_weight = 0
+            SupplyVolumeGas = df.SupplyVolumeGas
+            SupplyVolumeElectricity = df.SupplyVolumeElectricity
+        else:
+            # Period post-April 2027
+            electricity_fixed_rate = 0
+            gas_fixed_rate = 0
+
+            gas_variable_rate, electricity_variable_rate = (
+                cls.calculate_whd_rate_variable(
+                    df.TargetSpendingForSchemeYear,
+                    df.SupplyVolumeGas,
+                    df.SupplyVolumeElectricity,
+                )
+            )
+            gas_weight = 0.5
+            elec_weight = 0.5
+            electricity_variable_weight = 1
+            electricity_fixed_weight = 0
+            gas_variable_weight = 1
+            gas_fixed_weight = 0
+            SupplyVolumeGas = df.SupplyVolumeGas
+            SupplyVolumeElectricity = df.SupplyVolumeElectricity
         return cls(
             name="Warm Homes Discount",
             short_name="whd",
             electricity_weight=elec_weight,
             gas_weight=gas_weight,
             tax_weight=0,
-            electricity_variable_weight=0,
-            electricity_fixed_weight=1,
-            gas_variable_weight=0,
-            gas_fixed_weight=1,
-            electricity_variable_rate=0,
-            electricity_fixed_rate=whd_levy,
-            gas_variable_rate=0,
-            gas_fixed_rate=whd_levy,
+            electricity_variable_weight=electricity_variable_weight,
+            electricity_fixed_weight=electricity_fixed_weight,
+            gas_variable_weight=gas_variable_weight,
+            gas_fixed_weight=gas_fixed_weight,
+            electricity_variable_rate=electricity_variable_rate,
+            electricity_fixed_rate=electricity_fixed_rate,
+            gas_variable_rate=gas_variable_rate,
+            gas_fixed_rate=gas_fixed_rate,
             general_taxation=0,
             revenue=revenue,
             price_cap_period=price_cap_period,
@@ -1335,16 +1403,18 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
             NoncoreSpending=df.NoncoreSpending,
             ObligatedSuppliersCustomerBase=df.ObligatedSuppliersCustomerBase,
             CompulsorySupplierFractionOfCoreGroup=df.CompulsorySupplierFractionOfCoreGroup,
+            SupplyVolumeGas=SupplyVolumeGas,
+            SupplyVolumeElectricity=SupplyVolumeElectricity,
         )
 
     @staticmethod
-    def calculate_whd_rate(
+    def calculate_whd_rate_standing(
         TargetSpendingForSchemeYear: float,
         CoreSpending: float,
         NoncoreSpending: float,
         ObligatedSuppliersCustomerBase: int,
         CompulsorySupplierFractionOfCoreGroup: float,
-    ) -> "WHD":
+    ) -> float:
         """Calculate warm homes discount rate for given values."""
         return (
             (TargetSpendingForSchemeYear / ObligatedSuppliersCustomerBase)
@@ -1356,6 +1426,18 @@ NoncoreSpending, ObligatedSuppliersCustomerBase, CompulsorySupplierFractionOfCor
                 )
                 / ObligatedSuppliersCustomerBase
             )
+        )
+
+    @staticmethod
+    def calculate_whd_rate_variable(
+        TargetSpendingForSchemeYear: float,
+        SupplyVolumeGas: float,
+        SupplyVolumeElectricity: float,
+    ) -> float:
+        """Calculate warm homes discount rate for given values."""
+        return (
+            (TargetSpendingForSchemeYear / 2) / SupplyVolumeGas,
+            (TargetSpendingForSchemeYear / 2) / SupplyVolumeElectricity,
         )
 
 
