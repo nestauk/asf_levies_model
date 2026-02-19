@@ -563,7 +563,7 @@ def process_data_losses(
     ]
 
     # Gets full table of losses data
-    losses_df = _process_data("Losses", params, params * 4, fileobject)
+    losses_df = _process_data("Losses", params * 4, params * 4, fileobject)
     # Return relevant parts of the table
     if (policy_acronym == "aahedc") & (metering_arrangement == "single-rate"):
         losses_df = losses_df.iloc[:, range(2, 16)]
