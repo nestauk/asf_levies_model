@@ -261,6 +261,238 @@ use the calculate_nil_consumption method.
                 )
             return new_tariff
 
+    def update_debt_related_costs(
+        self,
+        fixed_working_capital_costs: float,
+        fixed_bad_debt_costs: float,
+        fixed_admin_costs: float,
+        variable_working_capital_costs: float,
+        variable_bad_debt_costs: float,
+        variable_admin_costs: float,
+        consumption: float,
+        inplace: bool = False,
+    ) -> Optional["Tariff"]:
+        """DRC are dynamic, if you change other bill components you should update these costs after followed by EBIT and HAP.
+        Parameters are available in the Ofgem 'Default tariff cap level' publication.
+        Consumption is the expected typical consumption value used by ofgem, presently 2.7 and 11.5 for electricity and gas.
+        """
+        nil_bill_components = [
+            "aa_nil",
+            "cm_nil",
+            "co_nil",
+            "df_nil",
+            "ic_nil",
+            "nc_nil",
+            "oc_nil",
+            "paac_nil",
+            "pap_nil",
+            "pc_nil",
+            "smncc_nil",
+        ]
+        var_bill_components = [
+            "aa",
+            "cm",
+            "co",
+            "df",
+            "ic",
+            "nc",
+            "oc",
+            "paac",
+            "pap",
+            "pc",
+            "smncc",
+        ]
+
+        nil_sum = sum(
+            [
+                getattr(self, key) if getattr(self, key) != None else 0
+                for key in nil_bill_components
+            ]
+        )
+        drc_nil = (
+            (nil_sum * fixed_working_capital_costs)
+            + (nil_sum * fixed_bad_debt_costs)
+            + fixed_admin_costs
+        )
+
+        benchmark = (
+            sum(
+                [
+                    (
+                        getattr(self, key) * consumption
+                        if getattr(self, key) != None
+                        else 0
+                    )
+                    for key in var_bill_components
+                ]
+            )
+            + nil_sum
+        )
+        drc = (
+            (benchmark * variable_working_capital_costs)
+            + (benchmark * variable_bad_debt_costs)
+            + variable_admin_costs
+        )
+
+        # Convert to attribute scale
+        drc = (drc - drc_nil) / consumption
+
+        if inplace:
+            self.drc = drc
+            self.drc_nil = drc_nil
+            return None
+        else:
+            new_tariff = self.copy(deep=True)
+            new_tariff.drc = drc
+            new_tariff.drc_nil = drc_nil
+            return new_tariff
+
+    def update_ebit(
+        self,
+        ebit_fixed: float,
+        ebit_variable: float,
+        consumption: float,
+        inplace: bool = False,
+    ) -> Optional["Tariff"]:
+        """EBIT is dynamic, if you change other bill components you should update these costs after preceeded by DRC and followed by HAP.
+        Parameters are available in the Ofgem 'Default tariff cap level' publication.
+        Consumption is the expected typical consumption value used by ofgem, presently 2.7 and 11.5 for electricity and gas.
+        """
+        nil_bill_components = [
+            "aa_nil",
+            "cm_nil",
+            "co_nil",
+            "df_nil",
+            "ic_nil",
+            "nc_nil",
+            "drc_nil",
+            "oc_nil",
+            "paac_nil",
+            "pap_nil",
+            "pc_nil",
+            "smncc_nil",
+        ]
+        var_bill_components = [
+            "aa",
+            "cm",
+            "co",
+            "df",
+            "ic",
+            "nc",
+            "oc",
+            "paac",
+            "pap",
+            "drc",
+            "pc",
+            "smncc",
+        ]
+
+        nil_sum = sum(
+            [
+                getattr(self, key) if getattr(self, key) != None else 0
+                for key in nil_bill_components
+            ]
+        )
+        benchmark = (
+            sum(
+                [
+                    (
+                        getattr(self, key) * consumption
+                        if getattr(self, key) != None
+                        else 0
+                    )
+                    for key in var_bill_components
+                ]
+            )
+            + nil_sum
+        )
+        ebit = benchmark * ebit_variable + (ebit_fixed / 2)
+        ebit_nil = nil_sum * (ebit / benchmark)
+
+        # Convert to attribute scale
+        ebit = (ebit - ebit_nil) / consumption
+
+        if inplace:
+            self.ebit = ebit
+            self.ebit_nil = ebit_nil
+            return None
+        else:
+            new_tariff = self.copy(deep=True)
+            new_tariff.ebit = ebit
+            new_tariff.ebit_nil = ebit_nil
+            return new_tariff
+
+    def update_headroom(
+        self, hap_rate: float, consumption: float, inplace: bool = False
+    ) -> Optional["Tariff"]:
+        """Headroom (HAP) is dynamic, if you change other bill components you should update these costs after preceeded by DRC and ebit.
+        Parameters are available in the Ofgem 'Default tariff cap level' publication.
+        Consumption is the expected typical consumption value used by ofgem, presently 2.7 and 11.5 for electricity and gas.
+        """
+        nil_bill_components = [
+            "aa_nil",
+            "cm_nil",
+            "co_nil",
+            "df_nil",
+            "ic_nil",
+            "drc_nil",
+            "ebit_nil",
+            "oc_nil",
+            "paac_nil",
+            "pap_nil",
+            "pc_nil",
+            "smncc_nil",
+        ]
+        var_bill_components = [
+            "aa",
+            "cm",
+            "co",
+            "df",
+            "ic",
+            "oc",
+            "paac",
+            "pap",
+            "drc",
+            "ebit",
+            "pc",
+            "smncc",
+        ]
+
+        nil_sum = sum(
+            [
+                getattr(self, key) if getattr(self, key) != None else 0
+                for key in nil_bill_components
+            ]
+        )
+        benchmark = (
+            sum(
+                [
+                    (
+                        getattr(self, key) * consumption
+                        if getattr(self, key) != None
+                        else 0
+                    )
+                    for key in var_bill_components
+                ]
+            )
+            + nil_sum
+        )
+        hap_nil = nil_sum * hap_rate
+        hap = benchmark * hap_rate
+
+        # Convert to attribute scale
+        hap = (hap - hap_nil) / consumption
+
+        if inplace:
+            self.hap = hap
+            self.hap_nil = hap_nil
+            return None
+        else:
+            new_tariff = self.copy(deep=True)
+            new_tariff.hap = hap
+            new_tariff.hap_nil = hap_nil
+            return new_tariff
+
     def copy(self, deep: bool = True) -> "Tariff":
         """Create copy of self."""
         if deep:
