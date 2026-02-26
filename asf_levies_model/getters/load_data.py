@@ -446,7 +446,12 @@ def process_data_WHD(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         "SupplyVolumeGas",
         "SupplyVolumeElectricity",
     ]
-    return _process_data("WHD", parameters, names, fileobject)
+    whd_df = _process_data("WHD", parameters, names, fileobject)
+    if "TargetSpendingForSchemeYear" not in whd_df.columns:
+        # allowing for wording changes in annex 4
+        parameters[0] = "Target spending for scheme year"  # old name
+        whd_df = _process_data("WHD", parameters, names, fileobject)
+    return whd_df
 
 
 def process_data_AAHEDC(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
