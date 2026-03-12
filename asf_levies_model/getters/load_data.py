@@ -429,7 +429,7 @@ def process_data_RO(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
 def process_data_WHD(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
     """Extracts and transforms data from corresponding WHD tab in annex 4 into tidy format."""
     parameters = [
-        "Target spending for scheme year",
+        "Target spending for scheme year/ Projected Scheme Costs",
         "   Of which core",
         "   Of which Non-core",
         "Number of customer of obligated suppliers at 31 December of the previous calendar year",
