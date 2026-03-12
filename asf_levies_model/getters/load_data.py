@@ -359,8 +359,15 @@ def _extract_policy_data(
         .astype(bool)
         .pipe(lambda df: df.index[df])
     )
+    # Assuming parameters map to names, get indices of paramters found.
+    names_index = [
+        i for i, param in enumerate(parameters) if policy_df.isin([param]).any().any()
+    ]
 
-    return policy_df.loc[parameter_row_indices, parameter_cols].to_numpy()
+    return (
+        policy_df.loc[parameter_row_indices, parameter_cols].to_numpy(),
+        names_index,
+    )
 
 
 def _process_data(
@@ -378,7 +385,8 @@ def _process_data(
     charging_years = _get_charging_years(df, policy_acronym)
     # Check update dates and charging years match
     _check_updates_years(update_dates, charging_years)
-    policy_data = _extract_policy_data(policy_parameters, df, update_dates)
+    policy_data, names_index = _extract_policy_data(policy_parameters, df, update_dates)
+    column_names = [column_names[i] for i in names_index]
     data_tidy_df = pd.concat(
         [
             pd.Series(update_dates, name="UpdateDate"),
@@ -390,6 +398,7 @@ def _process_data(
         ],
         axis=1,
     )
+
     # Make UpdateDate a datetime
     data_tidy_df["UpdateDate"] = pd.to_datetime(
         data_tidy_df["UpdateDate"], format="%B %Y"
@@ -425,6 +434,8 @@ def process_data_WHD(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         "   Of which Non-core",
         "Number of customer of obligated suppliers at 31 December of the previous calendar year",
         "Compulsory suppliers % of core group",
+        "Supply volumes of obligated suppliers - gas",
+        "Supply volumes of obligated suppliers - electricity",
     ]
     names = [
         "TargetSpendingForSchemeYear",
@@ -432,8 +443,15 @@ def process_data_WHD(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         "NoncoreSpending",
         "ObligatedSuppliersCustomerBase",
         "CompulsorySupplierFractionOfCoreGroup",
+        "SupplyVolumeGas",
+        "SupplyVolumeElectricity",
     ]
-    return _process_data("WHD", parameters, names, fileobject)
+    whd_df = _process_data("WHD", parameters, names, fileobject)
+    if "TargetSpendingForSchemeYear" not in whd_df.columns:
+        # allowing for wording changes in annex 4
+        parameters[0] = "Target spending for scheme year"  # old name
+        whd_df = _process_data("WHD", parameters, names, fileobject)
+    return whd_df
 
 
 def process_data_AAHEDC(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
@@ -550,7 +568,7 @@ def process_data_losses(
     ]
 
     # Gets full table of losses data
-    losses_df = _process_data("Losses", params, params * 4, fileobject)
+    losses_df = _process_data("Losses", params * 4, params * 4, fileobject)
     # Return relevant parts of the table
     if (policy_acronym == "aahedc") & (metering_arrangement == "single-rate"):
         losses_df = losses_df.iloc[:, range(2, 16)]
@@ -574,6 +592,7 @@ def process_data_ECO(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         "Annualised costs for scheme year attributed to electricity - ECO4",
         "Annualised costs for scheme year attributed to gas - Great British Insulation Scheme (GBIS) - formally ECO+",
         "Annualised costs for scheme year attributed to electricity -  Great British Insulation Scheme (GBIS) - formally ECO+",
+        "Uprate to current year prices using GDP deflator",
         "Uprate to current year prices using GDP deflator",
         "Share of supply volumes of all obligated suppliers accounted for by 'fully' obligated suppliers - gas",
         "Share of supply volumes of all obligated suppliers accounted for by 'fully' obligated suppliers - electricity",
