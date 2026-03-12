@@ -435,7 +435,7 @@ def process_data_WHD(fileobject: Optional[BytesIO] = None) -> pd.DataFrame:
         "Number of customer of obligated suppliers at 31 December of the previous calendar year",
         "Compulsory suppliers % of core group",
         "Supply volumes of obligated suppliers - gas",
-        "Supply volumes of obligated suppliers - electricity",
+        "Supply volumes of obligated suppliers - electricity ",
     ]
     names = [
         "TargetSpendingForSchemeYear",
